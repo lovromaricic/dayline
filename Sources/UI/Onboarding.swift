@@ -207,7 +207,7 @@ struct LimeSwitch: ToggleStyle {
     }
 }
 
-/// Banners under the header (StatusBanner in spec 8): granted, paused, lost.
+/// Banners at the top of the timeline, above the day header (StatusBanner in spec 8): granted, paused, lost.
 struct StatusBanner: View {
     @ObservedObject var vm: HomeViewModel
 

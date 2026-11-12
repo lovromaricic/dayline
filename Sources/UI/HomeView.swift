@@ -65,8 +65,9 @@ public struct HomeView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 20) {
-            header
+            // App state (paused, access lost or granted) sits above the day's summary.
             StatusBanner(vm: vm)
+            header
             timeline
             BlocksList(vm: vm, searchFocus: $searchFocused)
             if r.isToday && r.tracked > 0 && r.tracked < 30 * 60 && vm.phase == .tracking {
