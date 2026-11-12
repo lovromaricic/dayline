@@ -48,6 +48,15 @@ public enum BuiltinRules {
 
     /// Bundle id -> (name, category).
     static let apps: [String: (String, ActivityCategory)] = [
+        // Entertainment
+        "com.apple.Music": ("Music", .entertainment),
+        "com.apple.TV": ("TV", .entertainment),
+        "com.apple.podcasts": ("Podcasts", .entertainment),
+        "com.spotify.client": ("Spotify", .entertainment),
+        "com.tidal.desktop": ("TIDAL", .entertainment),
+        "org.videolan.vlc": ("VLC", .entertainment),
+        "com.colliderli.iina": ("IINA", .entertainment),
+        "com.valvesoftware.steam": ("Steam", .entertainment),
         // Development
         "com.apple.dt.Xcode": ("Xcode", .development),
         "com.microsoft.VSCode": ("Visual Studio Code", .development),
@@ -171,7 +180,13 @@ public enum BuiltinRules {
         "confluence.com": .writing, "grammarly.com": .writing,
         // Browsing and research
         "wikipedia.org": .browsing, "news.ycombinator.com": .browsing, "reddit.com": .browsing,
-        "youtube.com": .browsing, "perplexity.ai": .browsing, "gemini.google.com": .browsing,
+        "perplexity.ai": .browsing, "gemini.google.com": .browsing,
+        // Entertainment
+        "youtube.com": .entertainment, "netflix.com": .entertainment, "twitch.tv": .entertainment,
+        "spotify.com": .entertainment, "soundcloud.com": .entertainment, "disneyplus.com": .entertainment,
+        "max.com": .entertainment, "hbomax.com": .entertainment, "primevideo.com": .entertainment,
+        "hulu.com": .entertainment, "crunchyroll.com": .entertainment, "deezer.com": .entertainment,
+        "tidal.com": .entertainment,
     ]
 
     /// Full hosts, for sites that share a registrable domain.
@@ -184,6 +199,7 @@ public enum BuiltinRules {
         "developer.apple.com": .development, "developer.android.com": .development,
         "cloud.google.com": .development, "console.aws.amazon.com": .development,
         "gemini.google.com": .browsing, "news.ycombinator.com": .browsing,
+        "music.apple.com": .entertainment, "tv.apple.com": .entertainment,
     ]
 
     /// LSApplicationCategoryType -> category (spec section 4, step 3).
@@ -196,5 +212,13 @@ public enum BuiltinRules {
         "public.app-category.reference": .browsing,
         "public.app-category.news": .browsing,
         "public.app-category.education": .browsing,
+        "public.app-category.music": .entertainment,
+        "public.app-category.entertainment": .entertainment,
+        "public.app-category.games": .entertainment,
     ]
+
+    /// Also covers the game subtypes (public.app-category.action-games and so on).
+    public static func appStoreCategory(_ type: String) -> ActivityCategory? {
+        appStoreCategories[type] ?? (type.hasSuffix("-games") ? .entertainment : nil)
+    }
 }

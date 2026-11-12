@@ -108,7 +108,9 @@ public struct SettingsView: View {
     public var body: some View {
         VStack(spacing: 0) {
             Text("SETTINGS").font(.system(size: 12, weight: .medium)).tracking(1.44).foregroundStyle(Theme.textMuted)
-                .frame(maxWidth: .infinity).frame(height: 48)
+                .frame(maxWidth: .infinity).frame(height: 38)
+                .background(Theme.surfaceWindow)
+                .zIndex(1)
             HStack(spacing: 0) {
                 sidebar
                 Group {
@@ -125,6 +127,8 @@ public struct SettingsView: View {
         .background(Theme.surfaceWindow)
         .foregroundStyle(Theme.text)
         .environment(\.colorScheme, .dark)
+        // Our own 38 pt header sits in the title bar, beside the window buttons.
+        .ignoresSafeArea(edges: .top)
     }
 
     private var sidebar: some View {

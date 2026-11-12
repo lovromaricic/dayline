@@ -43,7 +43,7 @@ import Testing
         let url = FileManager.default.temporaryDirectory.appending(path: "dayline-test-\(UUID().uuidString).sqlite")
         let db = try DaylineDatabase(url: url)
         let n = try db.pool.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM category") }
-        #expect(n == 7)
+        #expect(n == ActivityCategory.defaults.count)
     }
 }
 
@@ -134,7 +134,7 @@ import Testing
         #expect(try store.segments(from: 0, to: 100).isEmpty)
         #expect(try d.rules().isEmpty)
         #expect(try d.exclusionRows().isEmpty)
-        #expect(try d.categories() == ActivityCategory.seed + [.uncategorized])
+        #expect(try d.categories() == ActivityCategory.defaults)
         #expect(try d.setting("idle.minutes") == "5")
     }
 

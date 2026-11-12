@@ -21,9 +21,14 @@ public struct ActivityCategory: Hashable, Identifiable, Sendable {
     public static let communication = ActivityCategory(id: 5, name: "Communication", color: "#00B8CC")
     public static let browsing = ActivityCategory(id: 6, name: "Browsing and research", color: "#F0BF00")
     public static let uncategorized = ActivityCategory(id: 7, name: "Uncategorized", color: "#62666D")
+    /// Added after the first release (migration v2), hence the id after Uncategorized.
+    public static let entertainment = ActivityCategory(id: 8, name: "Entertainment", color: "#9B7CFF")
 
-    /// Seed order (spec section 3). Uncategorized is the system category.
+    /// Seed order (spec section 3), as inserted by migration v1. Uncategorized is the system category.
     public static let seed: [ActivityCategory] = [.development, .design, .meetings, .writing, .communication, .browsing]
+
+    /// Every built-in category, in sort order.
+    public static let defaults: [ActivityCategory] = seed + [.entertainment, .uncategorized]
 
     /// Colors offered for new categories: the seed hues plus a few more.
     public static let palette = ["#4EA7FC", "#FC7840", "#E8789E", "#27A644", "#00B8CC", "#F0BF00",

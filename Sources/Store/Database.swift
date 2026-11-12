@@ -55,7 +55,34 @@ public final class DaylineDatabase {
             }
             try db.execute(sql: "INSERT INTO category (name, color, sort, is_system) VALUES ('Uncategorized', '#62666D', 99, 1)")
         }
+        m.registerMigration("v2-entertainment") { db in
+            // Entertainment needs id 8, which built-in rules point at. A category
+            // of yours already called Entertainment becomes it; one of yours
+            // that holds id 8 under another name moves to a free id.
+            let e = ActivityCategory.entertainment
+            let named = try Int64.fetchOne(db, sql: "SELECT id FROM category WHERE name = ? COLLATE NOCASE", arguments: [e.name])
+            if named != e.id, try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM category WHERE id = ?)", arguments: [e.id]) == true {
+                let free = try Int64.fetchOne(db, sql: "SELECT MAX(id) + 1 FROM category") ?? e.id + 1
+                try renumberCategory(db, from: e.id, to: free)
+            }
+            if let named, named != e.id {
+                try renumberCategory(db, from: named, to: e.id)
+            } else if named == nil {
+                try db.execute(sql: "INSERT INTO category (id, name, color, sort) VALUES (?, ?, ?, ?)",
+                               arguments: [e.id, e.name, e.color, ActivityCategory.seed.count])
+            }
+        }
         return m
+    }
+
+    /// Moves a category to a new id, with everything that points at it.
+    private static func renumberCategory(_ db: GRDB.Database, from: Int64, to: Int64) throws {
+        try db.execute(sql: "PRAGMA defer_foreign_keys = ON")
+        try db.execute(sql: "UPDATE category SET id = ? WHERE id = ?", arguments: [to, from])
+        try db.execute(sql: "UPDATE segment SET category_id = ? WHERE category_id = ?", arguments: [to, from])
+        try db.execute(sql: "UPDATE rule SET category_id = ? WHERE category_id = ?", arguments: [to, from])
+        try db.execute(sql: "UPDATE setting SET value = ? WHERE key LIKE 'alias.%' AND value = ?", arguments: [String(to), String(from)])
+        try db.execute(sql: "UPDATE setting SET key = ? WHERE key = ?", arguments: ["alias.\(to)", "alias.\(from)"])
     }
 
     public func setting(_ key: String) throws -> String? {

@@ -14,7 +14,6 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
     private(set) var dayStart: Int64
     /// The day's segments as last loaded, for corrections.
     private var segments: [Segment] = []
-    var onOpenSettings: (() -> Void)?
     /// Rules changed: the popover and menu bar total need a refresh too.
     var onRulesChanged: (() -> Void)?
 
@@ -26,7 +25,6 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         super.init()
         viewModel.onMoveDay = { [weak self] days in self?.move(days: days) }
         viewModel.onPickDay = { [weak self] date in self?.show(day: Self.startOfDay(date)) }
-        viewModel.onOpenSettings = { [weak self] in self?.onOpenSettings?() }
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
         viewModel.onAlways = { [weak self] correction in self?.always(correction) }
         viewModel.onOpenSystemSettings = { engine.openSystemSettings() }
@@ -39,7 +37,9 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         }
         viewModel.startAtLogin = LoginItem.isOn || !loginChosen
         viewModel.onSetStartAtLogin = { [weak self] on in self?.setStartAtLogin(on) }
-        syncPhase()
+        // No syncPhase() here: before engine.start() the phase is always
+        // needsPermission, and adopting it made every launch look like a fresh
+        // grant (the "access granted" banner). The engine's first change syncs it.
     }
 
     // MARK: - Tracking state (spec 2.2, screens 03–07)
@@ -177,6 +177,11 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
         w.title = "Dayline"
+        // An empty compact toolbar gives a 38 pt title bar with the window
+        // buttons centered in it, so they line up with our header.
+        w.toolbar = NSToolbar(identifier: "DaylineMain")
+        w.toolbarStyle = .unifiedCompact
+        w.titlebarSeparatorStyle = .none
         w.appearance = NSAppearance(named: .darkAqua)
         w.backgroundColor = NSColor(srgbRed: 0x10 / 255, green: 0x11 / 255, blue: 0x13 / 255, alpha: 1)
         w.isReleasedWhenClosed = false

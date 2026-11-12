@@ -57,7 +57,7 @@ extension DaylineDatabase {
             try db.execute(sql: "DELETE FROM segment; DELETE FROM rule; DELETE FROM exclusion;")
             try db.execute(sql: "DELETE FROM setting WHERE key LIKE 'alias.%'")
             try db.execute(sql: "DELETE FROM category WHERE id > ?", arguments: [ActivityCategory.uncategorized.id])
-            for (sort, c) in (ActivityCategory.seed + [.uncategorized]).enumerated() {
+            for (sort, c) in ActivityCategory.defaults.enumerated() {
                 try db.execute(sql: "INSERT OR REPLACE INTO category (id, name, color, sort, is_system) VALUES (?, ?, ?, ?, ?)",
                                arguments: [c.id, c.name, c.color, c == .uncategorized ? 99 : sort,
                                            c == .uncategorized ? 1 : 0])

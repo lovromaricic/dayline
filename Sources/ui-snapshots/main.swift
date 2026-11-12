@@ -98,7 +98,10 @@ func vm(_ report: DayReport, _ phase: TrackingPhase, granted: Bool = false) -> H
 let morning = DayReport(segments: Array(homeDay.prefix(5)) + [hseg(at(12, 0), at(12, 40), "", nil, .untracked)],
                         dayStart: dayStart, now: at(12, 40), category: homeCategory)
 let empty = DayReport(segments: [], dayStart: dayStart, now: at(9, 0), category: homeCategory)
+let filteredVM = HomeViewModel(report: homeReport)
+filteredVM.categoryFilter = homeReport.lanes.first?.category
 let homes: [(String, HomeViewModel)] = [
+    ("home-08-filtered", filteredVM),
     ("home-01-selected", selectedVM),
     ("home-02-nothing-selected", HomeViewModel(report: homeReport)),
     ("home-03-first-launch", vm(empty, .needsPermission)),

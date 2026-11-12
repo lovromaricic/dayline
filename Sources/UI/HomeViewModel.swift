@@ -43,7 +43,7 @@ public final class HomeViewModel: ObservableObject {
     @Published public var showAllBlocks = false
     @Published public var showAllLanes = false
     /// All categories, for the inspector's select.
-    @Published public var categories: [ActivityCategory] = ActivityCategory.seed + [.uncategorized]
+    @Published public var categories: [ActivityCategory] = ActivityCategory.defaults
     /// Shown under the select after a correction, until answered or deselected.
     @Published public var pendingCorrection: Correction?
 
@@ -65,7 +65,6 @@ public final class HomeViewModel: ObservableObject {
     /// Move by whole days; the app reloads `report`.
     public var onMoveDay: ((Int) -> Void)?
     public var onPickDay: ((Date) -> Void)?
-    public var onOpenSettings: (() -> Void)?
     /// Re-categorize just this block (the app writes the override and reloads).
     public var onSetCategory: ((Block, ActivityCategory) -> Void)?
     /// "Always": turn the correction into a rule.

@@ -10,6 +10,13 @@ struct BlocksList: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 16) {
                 Text(title).eyebrow()
+                if vm.isFiltering, let total = filteredTotal {
+                    // The time those blocks add up to, brighter than the eyebrow.
+                    (Text("· ").foregroundColor(Theme.textMuted) + Text(Durations.format(total)).foregroundColor(Theme.text))
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .tracking(0.96)
+                        .padding(.leading, -12)
+                }
                 Spacer()
                 TextField("Search tab titles", text: $vm.search)
                     .textFieldStyle(.plain)
@@ -71,8 +78,24 @@ struct BlocksList: View {
     }
 
     private var title: String {
-        let n = vm.report.blocks.count
-        return vm.report.isToday ? "BLOCKS · \(n) TODAY" : "BLOCKS · \(n)"
+        guard vm.isFiltering else {
+            let n = vm.report.blocks.count
+            return vm.report.isToday ? "BLOCKS · \(n) TODAY" : "BLOCKS · \(n)"
+        }
+        let n = vm.filteredBlocks.count
+        let blocks = (vm.search.isEmpty ? "" : "MATCHING ") + (n == 1 ? "BLOCK" : "BLOCKS")
+        let count = "\(n) \(blocks)"
+        return vm.categoryFilter.map { "\($0.name.uppercased()) · \(count)" } ?? count
+    }
+
+    /// A category alone shows its lane total, as in the chart and popover;
+    /// with a search it is the sum of the matching blocks.
+    private var filteredTotal: Int64? {
+        if vm.search.isEmpty, let c = vm.categoryFilter, let lane = vm.report.lanes.first(where: { $0.category == c }) {
+            return lane.total
+        }
+        let blocks = vm.filteredBlocks
+        return blocks.isEmpty ? nil : blocks.reduce(0) { $0 + $1.duration }
     }
 
     private var emptyText: String {

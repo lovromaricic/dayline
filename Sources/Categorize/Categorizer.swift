@@ -20,7 +20,7 @@ public struct Categorizer: Sendable {
     /// LSApplicationCategoryType for a bundle id; supplied by the app (needs AppKit).
     public var appCategoryType: @Sendable (String) -> String? = { _ in nil }
 
-    public init(categories: [ActivityCategory] = ActivityCategory.seed + [.uncategorized], rules: [Rule] = []) {
+    public init(categories: [ActivityCategory] = ActivityCategory.defaults, rules: [Rule] = []) {
         setCategories(categories)
         setRules(rules)
     }
@@ -60,7 +60,7 @@ public struct Categorizer: Sendable {
             seed = .meetings
         } else if let c = BuiltinRules.category(for: s) {
             seed = c
-        } else if let type = appCategoryType(s.appBundleID), let c = BuiltinRules.appStoreCategories[type] {
+        } else if let type = appCategoryType(s.appBundleID), let c = BuiltinRules.appStoreCategory(type) {
             seed = c
         } else {
             seed = .uncategorized

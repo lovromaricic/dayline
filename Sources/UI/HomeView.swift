@@ -29,6 +29,8 @@ public struct HomeView: View {
         .background(Theme.surfaceWindow)
         .foregroundStyle(Theme.text)
         .environment(\.colorScheme, .dark)
+        // Our own 38 pt header sits in the title bar, beside the window buttons.
+        .ignoresSafeArea(edges: .top)
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(.upArrow) { vm.moveSelection(-1); return .handled }
@@ -95,21 +97,14 @@ public struct HomeView: View {
 
     // MARK: - Title bar (the system draws the window buttons)
 
+    /// Clicks in the title bar go to the window, not to SwiftUI, so this
+    /// holds only the label; Settings is in the popover and on ⌘,.
     private var titleBar: some View {
-        ZStack {
-            Text("DAYLINE").font(.system(size: 12, weight: .medium)).tracking(1.44).foregroundStyle(Theme.textMuted)
-            HStack {
-                Spacer()
-                Button(action: { vm.onOpenSettings?() }) {
-                    SlidersGlyph().scaleEffect(0.9).frame(width: 32, height: 32).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Settings (⌘,)")
-                .accessibilityLabel("Settings")
-            }
-            .padding(.trailing, 14)
-        }
-        .frame(height: 48)
+        Text("DAYLINE").font(.system(size: 12, weight: .medium)).tracking(1.44).foregroundStyle(Theme.textMuted)
+            .frame(maxWidth: .infinity).frame(height: 38)
+            // Opaque and on top, so scrolled blocks pass under it.
+            .background(Theme.surfaceWindow)
+            .zIndex(1)
     }
 
     // MARK: - Header
@@ -181,22 +176,22 @@ public struct HomeView: View {
 
     private var timeline: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("WHEN YOU DID WHAT").eyebrow()
-                Spacer()
-                HStack(spacing: 20) {
-                    ForEach(TimelineMode.allCases, id: \.self) { mode in
-                        let on = vm.mode == mode
-                        Button(mode.rawValue) { vm.mode = mode }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(on ? Theme.text : Theme.textMuted)
-                            .frame(height: 26)
-                            .overlay(alignment: .bottom) {
-                                Rectangle().fill(on ? Theme.text : .clear).frame(height: 1.5)
-                            }
-                            .accessibilityAddTraits(on ? .isSelected : [])
-                    }
+            // The view switch is the section heading: eyebrow-style tabs.
+            HStack(spacing: 20) {
+                ForEach(TimelineMode.allCases, id: \.self) { mode in
+                    let on = vm.mode == mode
+                    Button(mode.rawValue.uppercased()) { vm.mode = mode }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .tracking(0.96)
+                        .foregroundStyle(on ? Theme.text : Theme.textMuted)
+                        .frame(height: 26)
+                        .overlay(alignment: .bottom) {
+                            Rectangle().fill(on ? Theme.text : .clear).frame(height: 1.5)
+                        }
+                        .contentShape(Rectangle())
+                        .accessibilityLabel(mode.rawValue)
+                        .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
             TimelineChart(vm: vm)

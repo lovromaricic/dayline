@@ -40,7 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.onPopoverShow = { [weak self] in self?.refresh() }
         statusItem.onOpenTimeline = { [weak self] in self?.showTimeline() }
         timeline = TimelineWindowController(engine: engine)
-        timeline.onOpenSettings = { [weak self] in self?.openSettings() }
         timeline.onRulesChanged = { [weak self] in self?.refresh() }
         settings = SettingsController(engine: engine)
         settings.onChange = { [weak self] in

@@ -84,3 +84,17 @@ extension CategorizerTests {
         #expect(c.category(for: app("com.figma.Desktop")) == .uncategorized)
     }
 }
+
+extension CategorizerTests {
+    @Test func entertainmentAppsSitesAndTypes() {
+        var c = Categorizer()
+        c.appCategoryType = { $0 == "com.example.game" ? "public.app-category.puzzle-games" : nil }
+        let music = Segment(id: 1, start: 0, end: 60, kind: .active, appBundleID: "com.apple.Music", appName: "Music", title: nil, domain: nil)
+        let yt = Segment(id: 2, start: 0, end: 60, kind: .active, appBundleID: "com.google.Chrome", appName: "Google Chrome",
+                         title: "Video", host: "www.youtube.com", domain: "youtube.com")
+        let game = Segment(id: 3, start: 0, end: 60, kind: .active, appBundleID: "com.example.game", appName: "Game", title: nil, domain: nil)
+        #expect(c.resolve(music).category == .entertainment)
+        #expect(c.resolve(yt).category == .entertainment)
+        #expect(c.resolve(game).category == .entertainment)
+    }
+}
