@@ -10,7 +10,7 @@ public struct DaySummary: Equatable, Sendable {
         public var bars: [ClosedRange<Int64>]
     }
 
-    /// The block the user is in right now.
+    /// What the user is in right now (see DayReport.current).
     public struct Current: Equatable, Sendable {
         public var title: String
         public var appName: String
@@ -33,9 +33,7 @@ public struct DaySummary: Equatable, Sendable {
         rails = r.lanes.map { Rail(category: $0.category, total: $0.total, bars: $0.blocks.map { $0.start...$0.end }) }
         untracked = r.untracked
         axis = r.axis
-        current = r.blocks.last.flatMap { b in
-            b.isOpen ? Current(title: b.title ?? b.appName, appName: b.appName, category: b.category, since: b.start) : nil
-        }
+        current = r.current
     }
 
     public init(segments: [Segment], dayStart: Int64, now: Int64, category: (Segment) -> ActivityCategory) {

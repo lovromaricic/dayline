@@ -66,6 +66,10 @@ public struct DayReport: Equatable, Sendable {
     public var topApps: [AppTotal] = []
     public var longestFocus: Focus?
     public var axis: ClosedRange<Int64>
+    /// What you are in right now, from the raw segments: blocks need a
+    /// minute and may absorb a short visit into a neighbour, so they cannot
+    /// say what is in front during the first minute in an app.
+    public var current: DaySummary.Current?
 
     static let mergeGap: Int64 = 60
     static let minBlock: Int64 = 60
@@ -112,9 +116,17 @@ public struct DayReport: Equatable, Sendable {
         away = DayReport.visibleBreaks(away)
         untracked = DayReport.visibleBreaks(untracked)
         blocks = DayReport.blocks(from: clipped, resolution: { cache[$0.id]! })
-        if isToday, let last = blocks.last, let open = clipped.last, open.kind == .active,
-           last.segmentIDs.contains(open.id), now - open.end <= 15 {
-            blocks[blocks.count - 1].isOpen = true
+        if isToday, let open = clipped.last, open.kind == .active, now - open.end <= 15 {
+            if let last = blocks.last, last.segmentIDs.contains(open.id) { blocks[blocks.count - 1].isOpen = true }
+            // Since: back through segments of the same app, site and category with gaps under a minute.
+            let c = category(open)
+            var since = open.start
+            for s in clipped.dropLast().reversed() {
+                guard s.kind == .active, s.appBundleID == open.appBundleID, s.domain == open.domain,
+                      category(s) == c, since - s.end < DayReport.mergeGap else { break }
+                since = s.start
+            }
+            current = DaySummary.Current(title: open.title ?? open.appName, appName: open.appName, category: c, since: since)
         }
 
         var order: [ActivityCategory] = []

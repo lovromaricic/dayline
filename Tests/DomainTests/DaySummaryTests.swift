@@ -75,3 +75,17 @@ extension DaySummaryTests {
         #expect(summary.axis == report.axis)
     }
 }
+
+extension DaySummaryTests {
+    /// The first minute in an app has no block yet, but the popover still says what is in front.
+    @Test func currentBeforeTheFirstMinute() {
+        let segs = [
+            seg(at(9), at(9, 20), app: "xcode", title: "a.swift"),
+            seg(at(9, 20), at(9, 20) + 25, app: "chrome", domain: "github.com", title: "PR #42"),
+        ]
+        let d = DaySummary(segments: segs, dayStart: day, now: at(9, 20) + 25, category: cat)
+        #expect(d.current?.title == "PR #42")
+        #expect(d.current?.appName == "chrome")
+        #expect(d.current?.since == at(9, 20))
+    }
+}
