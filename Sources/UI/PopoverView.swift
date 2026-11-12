@@ -31,8 +31,10 @@ public struct PopoverView: View {
             }
             card
             if hasData && m.phase != .needsPermission && m.phase != .waitingForPermission {
-                DayBarcode(summary: m.summary, nowLine: m.phase == .tracking ? m.now : nil)
-                topCategories
+                VStack(alignment: .leading, spacing: 14) {
+                    CategorySplitBar(rails: m.summary.rails)
+                    topCategories
+                }
             }
             buttons
         }
@@ -109,11 +111,11 @@ public struct PopoverView: View {
 
     private var total: some View {
         let muted = m.phase == .needsPermission || m.phase == .waitingForPermission
-        // Negative spacing: the 64 pt line has room for descenders the digits never use.
+        // Negative spacing: the 52 pt line has room for descenders the digits never use.
         return VStack(alignment: .leading, spacing: -6) {
             Text(Durations.format(m.summary.tracked))
-                .font(.system(size: 64, weight: .light).monospacedDigit())
-                .tracking(-1.92)
+                .font(.system(size: 52, weight: .light).monospacedDigit())
+                .tracking(-1.56)
                 .foregroundStyle(muted ? Color(hex: 0xF4F3F7, opacity: 0.32) : Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -185,7 +187,8 @@ public struct PopoverView: View {
 
     /// "8 min", "1h 05m".
     private func minutesText(_ seconds: Int64) -> String {
-        seconds >= 3600 ? Durations.format(seconds) : "\(max(0, seconds) / 60) min"
+        if seconds < 60 { return "just now" }
+        return seconds >= 3600 ? Durations.format(seconds) : "\(seconds / 60) min"
     }
 
     // MARK: - Top categories
