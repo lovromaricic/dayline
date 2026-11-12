@@ -1,0 +1,158 @@
+import Domain
+import Foundation
+
+public enum TimelineMode: String, CaseIterable, Sendable {
+    case byCategory = "By category"
+    case timeline = "Timeline"
+}
+
+/// "Always categorize developer.apple.com as Development?" (spec 4, screen 01).
+public struct Correction: Equatable, Sendable {
+    public var blockID: Int64
+    public var kind: Rule.Kind
+    /// Host for sites, bundle id for apps.
+    public var pattern: String
+    /// What the prompt calls it: the host, or the app's name.
+    public var subject: String
+    public var category: ActivityCategory
+
+    public init(blockID: Int64, kind: Rule.Kind, pattern: String, subject: String, category: ActivityCategory) {
+        self.blockID = blockID
+        self.kind = kind
+        self.pattern = pattern
+        self.subject = subject
+        self.category = category
+    }
+
+    /// Browser blocks are about the site; everything else about the app.
+    public static func subject(for b: Block, category: ActivityCategory) -> Correction {
+        if let host = b.host {
+            return Correction(blockID: b.id, kind: .site, pattern: host, subject: host, category: category)
+        }
+        return Correction(blockID: b.id, kind: .app, pattern: b.appBundleID, subject: b.appName, category: category)
+    }
+}
+
+/// State of the main window. The app sets `report`; the view owns the rest.
+public final class HomeViewModel: ObservableObject {
+    @Published public var report: DayReport
+    @Published public var selection: Int64?
+    @Published public var mode = TimelineMode.byCategory
+    @Published public var search = ""
+    @Published public var categoryFilter: ActivityCategory?
+    @Published public var showAllBlocks = false
+    @Published public var showAllLanes = false
+    /// All categories, for the inspector's select.
+    @Published public var categories: [ActivityCategory] = ActivityCategory.seed + [.uncategorized]
+    /// Shown under the select after a correction, until answered or deselected.
+    @Published public var pendingCorrection: Correction?
+
+    // Tracking state (spec 2.2) and onboarding settings (screens 03–07).
+    @Published public var phase: TrackingPhase = .tracking
+    /// "Accessibility access granted" banner, after a grant in this session.
+    @Published public var showGrantedBanner = false
+    @Published public var idleMinutes = 2
+    public var idleChoices = [1, 2, 3, 5, 10]
+    @Published public var startAtLogin = true
+    /// Shown under the Start at login switch when macOS refused the change.
+    @Published public var startAtLoginError: String?
+
+    public var onOpenSystemSettings: (() -> Void)?
+    public var onResume: (() -> Void)?
+    public var onSetIdleMinutes: ((Int) -> Void)?
+    public var onSetStartAtLogin: ((Bool) -> Void)?
+
+    /// Move by whole days; the app reloads `report`.
+    public var onMoveDay: ((Int) -> Void)?
+    public var onPickDay: ((Date) -> Void)?
+    public var onOpenSettings: (() -> Void)?
+    /// Re-categorize just this block (the app writes the override and reloads).
+    public var onSetCategory: ((Block, ActivityCategory) -> Void)?
+    /// "Always": turn the correction into a rule.
+    public var onAlways: ((Correction) -> Void)?
+
+    /// The inspector select or a drag to another lane.
+    public func setCategory(_ block: Block, _ category: ActivityCategory) {
+        guard category != block.category else { return }
+        // Set before the reload, so update() can follow the block if it merges.
+        selection = block.id
+        // Picking Dayline's own guess again is an undo, not a correction.
+        pendingCorrection = category == block.guess ? nil : Correction.subject(for: block, category: category)
+        onSetCategory?(block, category)
+    }
+
+    public func always() {
+        guard let c = pendingCorrection else { return }
+        onAlways?(c)
+        pendingCorrection = nil
+    }
+
+    public init(report: DayReport) {
+        self.report = report
+    }
+
+    /// Spec 5.3: lists show the 3 most recent blocks until expanded.
+    public static let collapsedCount = 3
+    /// Spec 5.3: at most 8 lanes before "+N more".
+    public static let laneCap = 8
+
+    public var isFiltering: Bool { !search.isEmpty || categoryFilter != nil }
+
+    /// Newest first, after search and category filter.
+    public var filteredBlocks: [Block] {
+        let q = search.trimmingCharacters(in: .whitespaces)
+        return report.blocks.reversed().filter { b in
+            (categoryFilter == nil || b.category == categoryFilter)
+                && (q.isEmpty || [b.title, b.appName, b.host].contains { $0?.localizedCaseInsensitiveContains(q) ?? false })
+        }
+    }
+
+    public var visibleBlocks: [Block] {
+        let all = filteredBlocks
+        return showAllBlocks || isFiltering ? all : Array(all.prefix(Self.collapsedCount))
+    }
+
+    public var selectedBlock: Block? {
+        selection.flatMap { id in report.blocks.first { $0.id == id } }
+    }
+
+    public func select(_ id: Int64?) {
+        if id != selection { pendingCorrection = nil }
+        selection = id
+        // Keep the selected row visible in the list.
+        if let id, !visibleBlocks.contains(where: { $0.id == id }) {
+            search = ""
+            categoryFilter = nil
+            showAllBlocks = true
+        }
+    }
+
+    /// ↑ / ↓: move through blocks in list order (newest first).
+    public func moveSelection(_ delta: Int) {
+        let list = filteredBlocks
+        guard !list.isEmpty else { return }
+        guard let id = selection, let i = list.firstIndex(where: { $0.id == id }) else {
+            select(list.first?.id)
+            return
+        }
+        select(list[min(max(i + delta, 0), list.count - 1)].id)
+    }
+
+    /// Replaces the report, keeping the selection if the block still exists.
+    public func update(_ new: DayReport) {
+        if new.dayStart != report.dayStart {
+            selection = nil
+            showAllBlocks = false
+            showAllLanes = false
+            search = ""
+            categoryFilter = nil
+            pendingCorrection = nil
+        } else if let id = selection, !new.blocks.contains(where: { $0.id == id }) {
+            // A correction can merge the block into a neighbour; follow its segments.
+            let moved = new.blocks.first { $0.segmentIDs.contains(id) }?.id
+            selection = moved
+            if let moved { pendingCorrection?.blockID = moved } else { pendingCorrection = nil }
+        }
+        if new != report { report = new }
+    }
+}

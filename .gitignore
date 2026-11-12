@@ -1,0 +1,5 @@
+.build/
+build/
+.DS_Store
+# Created when the package is opened in Xcode
+.swiftpm/
