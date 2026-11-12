@@ -6,7 +6,7 @@ import SwiftUI
 import UI
 
 // Renders the popover in every state with sample data, for comparing
-// against design/screens. Usage: ui-snapshots [output-dir]
+// against design/screens. Usage: ui-snapshots [output-dir] [--today | --animate]
 
 // --today renders your real day from the Dayline database (stays in build/, git-ignored).
 let realDay = CommandLine.arguments.contains("--today")
@@ -17,8 +17,11 @@ let cal = Calendar.current
 let dayStart = Int64(cal.startOfDay(for: Date()).timeIntervalSince1970)
 func at(_ h: Int, _ m: Int) -> Int64 { dayStart + Int64(h * 3600 + m * 60) }
 
+// Unique ids: DayReport caches categories by segment id.
+var segID: Int64 = 1000
 func seg(_ s: Int64, _ e: Int64, _ app: String, _ title: String? = nil, _ kind: SegmentKind = .active, call: Bool = false) -> Segment {
-    Segment(id: 0, start: s, end: e, kind: kind, appBundleID: app, appName: app, title: title, call: call)
+    segID += 1
+    return Segment(id: segID, start: s, end: e, kind: kind, appBundleID: app, appName: app, title: title, call: call)
 }
 let palette: [String: ActivityCategory] = ["Xcode": .development, "Figma": .design, "Zoom": .meetings,
                                            "Notion": .writing, "Slack": .communication, "Chrome": .browsing]
@@ -51,6 +54,60 @@ let states: [(String, PopoverModel)] = [
     ("tracking-away", PopoverModel(phase: .tracking, summary: summary(Array(day.prefix(6)), now: at(12, 40)), nowStatus: .away(since: at(12, 10)), now: at(12, 40))),
     ("tracking-private", PopoverModel(phase: .tracking, summary: summary(Array(day.prefix(5)), now: at(12, 20)), nowStatus: .hidden, now: at(12, 20))),
 ]
+
+// --animate: frames of the popover's transitions while it is open (pause,
+// a minute ticking over, switching apps), to judge the motion.
+if CommandLine.arguments.contains("--animate") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let t0 = at(16, 10)
+    let base = PopoverModel(phase: .tracking, summary: summary(day, now: t0), nowStatus: .none, now: t0)
+    let longer = day.dropLast() + [seg(at(15, 35), at(16, 11), "Xcode", "Pull request #42 · GitHub")]
+    let ticked = PopoverModel(phase: .tracking, summary: summary(Array(longer), now: t0 + 60), nowStatus: .none, now: t0 + 60)
+    let switched = PopoverModel(phase: .tracking, summary: summary(Array(longer) + [seg(at(16, 11), at(16, 11) + 5, "Slack", "#design")],
+                                                                     now: t0 + 65), nowStatus: .none, now: t0 + 65)
+    let pausedNow = PopoverModel(phase: .paused(since: t0 + 70, until: nil), summary: summary(Array(longer), now: t0 + 70),
+                                 nowStatus: .none, now: t0 + 70)
+    let vm = PopoverViewModel(model: base)
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 640), styleMask: .borderless, backing: .buffered, defer: false)
+    // Hosted like the app's PopoverPanel: a twin measures, the window keeps its
+    // top edge, and the visible content is pinned top-left.
+    let measure = NSHostingView(rootView: PopoverView(viewModel: vm, actions: noop))
+    measure.sizingOptions = [.intrinsicContentSize]
+    let host = NSHostingView(rootView: GeometryReader { _ in PopoverView(viewModel: vm, actions: noop) })
+    host.sizingOptions = []
+    window.contentView = host
+    window.setContentSize(measure.fittingSize)
+    window.setFrameOrigin(NSPoint(x: -5000, y: -5000))
+    func refit() {
+        let size = measure.fittingSize
+        window.setFrame(NSRect(x: window.frame.minX, y: window.frame.maxY - size.height, width: size.width, height: size.height), display: true)
+    }
+    window.orderFrontRegardless()
+    // Away has a two-line card, so pausing from it changes the popover's height.
+    let away = PopoverModel(phase: .tracking, summary: summary(Array(longer), now: t0 + 80), nowStatus: .away(since: t0), now: t0 + 80)
+    // Starting up has a two-line card, so the card has to grow.
+    let starting = PopoverModel(phase: .tracking, summary: summary(Array(day.prefix(5)), now: t0 + 90), nowStatus: .none, now: t0 + 90)
+    let steps: [(String, PopoverModel)] = [("tick", ticked), ("switch", switched), ("pause", pausedNow), ("resume", ticked),
+                                           ("away", away), ("pause2", pausedNow), ("grow", starting)]
+    func grab(_ name: String) {
+        let v = window.contentView!
+        let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
+        v.cacheDisplay(in: v.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "anim-\(name).png"))
+    }
+    var t = 0.5
+    for (name, model) in steps {
+        DispatchQueue.main.asyncAfter(deadline: .now() + t) { withAnimation(.smooth(duration: 0.35)) { vm.model = model }
+            DispatchQueue.main.async { refit() } }
+        for ms in stride(from: 0, through: 500, by: 25) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + t + Double(ms) / 1000) { grab("\(name)-\(ms)") }
+        }
+        t += 1
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + t) { exit(0) }
+    app.run()
+}
 
 // Main window, data shaped like screens 01/02.
 var homeID: Int64 = 0

@@ -89,3 +89,16 @@ extension DaySummaryTests {
         #expect(d.current?.since == at(9, 20))
     }
 }
+
+extension DaySummaryTests {
+    /// Right after resuming or switching, the open segment is zero seconds long.
+    @Test func currentRightAfterSwitching() {
+        let segs = [
+            seg(at(9), at(9, 20), app: "xcode", title: "a.swift"),
+            seg(at(9, 20), at(9, 20), app: "chrome", domain: "github.com", title: "PR #42"),
+        ]
+        let d = DaySummary(segments: segs, dayStart: day, now: at(9, 20) + 2, category: cat)
+        #expect(d.current?.title == "PR #42")
+        #expect(d.current?.since == at(9, 20))
+    }
+}

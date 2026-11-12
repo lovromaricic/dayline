@@ -21,6 +21,7 @@ public struct PopoverView: View {
 
     private var m: PopoverModel { viewModel.model }
     private var hasData: Bool { !m.summary.rails.isEmpty }
+    private var isPaused: Bool { if case .paused = m.phase { true } else { false } }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -33,6 +34,7 @@ public struct PopoverView: View {
             if hasData && m.phase != .needsPermission && m.phase != .waitingForPermission {
                 VStack(alignment: .leading, spacing: 14) {
                     CategorySplitBar(rails: m.summary.rails)
+                        .opacity(isPaused ? 0.4 : 1)
                     topCategories
                 }
             }
@@ -51,28 +53,36 @@ public struct PopoverView: View {
 
     private var header: some View {
         HStack {
-            Text(statusText).eyebrow()
-            Spacer()
-            switch m.phase {
-            case .tracking:
-                Button(action: { actions.pause(.untilResumed) }) {
-                    headerButton("Pause") { PauseGlyph().frame(width: 14, height: 14) }
-                }
-                .buttonStyle(.plain)
-                .help("Pause tracking. Right-click for more options.")
-                .accessibilityLabel("Pause tracking")
-                .contextMenu { pauseMenu }
-            case .paused:
-                Button(action: actions.resume) {
-                    headerButton("Resume") { PlayGlyph().frame(width: 12, height: 12) }
-                }
-                .buttonStyle(.plain)
-                .help("Resume tracking")
-                .accessibilityLabel("Resume tracking")
-                .contextMenu { pauseMenu }
-            default:
-                EmptyView()
+            ZStack(alignment: .leading) {
+                Text(statusText).eyebrow().id(statusText).transition(.swap)
             }
+            Spacer()
+            // Pause and Resume swap instantly; only the rest of the popover animates.
+            Group {
+                switch m.phase {
+                case .tracking:
+                    Button(action: { actions.pause(.untilResumed) }) {
+                        headerButton("Pause") { PauseGlyph().frame(width: 14, height: 14) }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Pause tracking. Right-click for more options.")
+                    .accessibilityLabel("Pause tracking")
+                    .contextMenu { pauseMenu }
+                    .transition(.identity)
+                case .paused:
+                    Button(action: actions.resume) {
+                        headerButton("Resume") { PlayGlyph().frame(width: 12, height: 12) }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Resume tracking")
+                    .accessibilityLabel("Resume tracking")
+                    .contextMenu { pauseMenu }
+                    .transition(.identity)
+                default:
+                    EmptyView()
+                }
+            }
+            .transaction { $0.animation = nil }
             settingsButton
         }
         .frame(minHeight: 36)
@@ -111,14 +121,18 @@ public struct PopoverView: View {
 
     private var total: some View {
         let muted = m.phase == .needsPermission || m.phase == .waitingForPermission
-        // Negative spacing: the 52 pt line has room for descenders the digits never use.
-        return VStack(alignment: .leading, spacing: -6) {
+        // The number gets a fixed 56 pt slot (its line height minus descender
+        // room the digits never use), so "Tracked today" sits at the same
+        // place whatever the number is doing, rolling digits included.
+        return VStack(alignment: .leading, spacing: 0) {
             Text(Durations.format(m.summary.tracked))
+                .contentTransition(.numericText(value: Double(m.summary.tracked)))
                 .font(.system(size: 52, weight: .light).monospacedDigit())
                 .tracking(-1.56)
                 .foregroundStyle(muted ? Color(hex: 0xF4F3F7, opacity: 0.32) : Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+                .frame(height: 56, alignment: .top)
             Text("Tracked today").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
         }
         .accessibilityElement(children: .combine)
@@ -128,13 +142,27 @@ public struct PopoverView: View {
 
     private var card: some View {
         let c = cardContent
-        return VStack(alignment: .leading, spacing: 4) {
+        // Overlaid so the old and new content swap in place.
+        return ZStack(alignment: .topLeading) {
+            cardBody(c).id(c.eyebrow + "|" + c.title + "|" + (c.dot?.description ?? ""))
+                .transition(.swap)
+        }
+        .padding(14)
+        // Top-aligned: when the text needs another line the card grows downward.
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func cardBody(_ c: (eyebrow: String, title: String, detail: String, dot: Color?)) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(c.eyebrow).eyebrow()
             Text(c.title).font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.tail)
             if let dot = c.dot {
                 HStack(spacing: 8) {
                     Circle().fill(dot).frame(width: 8, height: 8)
-                    Text(c.detail).lineLimit(1)
+                    Text(c.detail).lineLimit(1).contentTransition(.numericText())
                 }
                 .font(.system(size: 13)).foregroundStyle(Theme.textMuted)
             } else {
@@ -142,11 +170,6 @@ public struct PopoverView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.cardFill))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
-        .accessibilityElement(children: .combine)
     }
 
     private var cardContent: (eyebrow: String, title: String, detail: String, dot: Color?) {
@@ -203,6 +226,7 @@ public struct PopoverView: View {
                     }
                     Spacer()
                     Text(Durations.format(rail.total)).monospacedDigit().foregroundStyle(Theme.textMuted)
+                        .contentTransition(.numericText(value: Double(rail.total)))
                 }
                 .font(.system(size: 14))
                 .accessibilityElement(children: .combine)
@@ -258,4 +282,13 @@ public struct PopoverView: View {
     private func date(_ t: Int64) -> Date { Date(timeIntervalSince1970: TimeInterval(t)) }
 
     private func clock(_ t: Int64) -> String { Fmt.clock(t) }
+}
+
+extension AnyTransition {
+    /// Text that changes: the old fades out quickly, then the new fades in
+    /// and settles 3 pt, so two lines never sit on top of each other.
+    static var swap: AnyTransition {
+        .asymmetric(insertion: .opacity.combined(with: .offset(y: 3)).animation(.smooth(duration: 0.22).delay(0.1)),
+                    removal: .opacity.animation(.easeOut(duration: 0.1)))
+    }
 }

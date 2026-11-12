@@ -37,7 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             openSettings: { [weak self] in self?.openSettings() },
             openSystemSettings: { [weak self] in self?.engine.openSystemSettings() })
         statusItem = StatusItemController(engine: engine, popover: PopoverView(viewModel: popoverModel, actions: actions))
-        statusItem.onPopoverShow = { [weak self] in self?.refresh() }
+        // Opening shows the current state as is; only changes while it is open animate.
+        statusItem.onPopoverShow = { [weak self] in self?.refresh(animated: false) }
         statusItem.onOpenTimeline = { [weak self] in self?.showTimeline() }
         timeline = TimelineWindowController(engine: engine)
         timeline.onRulesChanged = { [weak self] in self?.refresh() }
@@ -75,14 +76,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.line("quit")
     }
 
-    private func refresh() {
+    private func refresh(animated: Bool = true) {
         let now = TrackingEngine.now()
         let dayStart = Int64(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)
         let segments = (try? engine.store.segments(from: dayStart, to: dayStart + 86_400)) ?? []
         let categorizer = engine.categorizer
         let summary = DaySummary(segments: segments, dayStart: dayStart, now: now, resolve: { categorizer.resolve($0) })
         let model = PopoverModel(phase: engine.phase, summary: summary, nowStatus: engine.nowStatus, now: now)
-        if model != popoverModel.model { popoverModel.model = model }
+        if model != popoverModel.model {
+            if animated, statusItem.isPopoverShown, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                withAnimation(.smooth(duration: 0.35)) { popoverModel.model = model }
+            } else {
+                popoverModel.model = model
+            }
+        }
         statusItem.update(phase: engine.phase, tracked: summary.tracked, showTotal: engine.showTotalInMenuBar)
         DispatchQueue.main.async { self.statusItem.refitPopover() }
     }

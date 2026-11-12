@@ -113,8 +113,19 @@ private final class ClosureTarget: NSObject {
 /// focus for keyboard use; Esc closes it.
 final class PopoverPanel: NSPanel {
     var onClose: (() -> Void)?
+    /// Off-screen twin of the content, only for measuring its size.
+    private let measure: NSView
 
     init(content: some View) {
+        // Two hosts. `measure` reports the size; show/refit apply it with the
+        // top edge kept under the menu bar. The visible host never sizes the
+        // window, and its GeometryReader pins the content to the top-left:
+        // while a change animates, the window already has its final size and
+        // a plain host would centre the in-between content in it, so
+        // everything would bob up and down.
+        let measure = NSHostingView(rootView: content)
+        measure.sizingOptions = [.intrinsicContentSize]
+        self.measure = measure
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         isFloatingPanel = true
         level = .popUpMenu
@@ -123,16 +134,17 @@ final class PopoverPanel: NSPanel {
         hasShadow = true
         hidesOnDeactivate = false
         collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
-        let host = NSHostingView(rootView: content)
+        let host = NSHostingView(rootView: GeometryReader { _ in content })
+        host.sizingOptions = []
         contentView = host
-        setContentSize(host.fittingSize)
+        setContentSize(measure.fittingSize)
     }
 
     override var canBecomeKey: Bool { true }
 
     func show(below item: NSRect) {
         guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(item) }) ?? NSScreen.main else { return }
-        if let host = contentView { setContentSize(host.fittingSize) }
+        setContentSize(measure.fittingSize)
         let size = frame.size
         var x = item.midX - size.width / 2
         x = min(max(x, screen.visibleFrame.minX + 8), screen.visibleFrame.maxX - size.width - 8)
@@ -149,8 +161,8 @@ final class PopoverPanel: NSPanel {
 
     /// Keeps the top edge in place when the content changes height.
     func refit() {
-        guard isVisible, let host = contentView else { return }
-        let size = host.fittingSize
+        guard isVisible else { return }
+        let size = measure.fittingSize
         guard size != frame.size else { return }
         setFrame(NSRect(x: frame.minX, y: frame.maxY - size.height, width: size.width, height: size.height), display: true)
     }

@@ -116,12 +116,15 @@ public struct DayReport: Equatable, Sendable {
         away = DayReport.visibleBreaks(away)
         untracked = DayReport.visibleBreaks(untracked)
         blocks = DayReport.blocks(from: clipped, resolution: { cache[$0.id]! })
-        if isToday, let open = clipped.last, open.kind == .active, now - open.end <= 15 {
+        // The open segment can still be zero seconds long (just resumed, just
+        // switched), which clipping drops; it is still what is in front.
+        if isToday, var open = segments.last, open.kind == .active, open.end >= dayStart, now - open.end <= 15 {
+            open.start = max(open.start, dayStart)
             if let last = blocks.last, last.segmentIDs.contains(open.id) { blocks[blocks.count - 1].isOpen = true }
             // Since: back through segments of the same app, site and category with gaps under a minute.
-            let c = category(open)
+            let c = cache[open.id]?.category ?? resolve(open).category
             var since = open.start
-            for s in clipped.dropLast().reversed() {
+            for s in clipped.reversed() where s.id != open.id {
                 guard s.kind == .active, s.appBundleID == open.appBundleID, s.domain == open.domain,
                       category(s) == c, since - s.end < DayReport.mergeGap else { break }
                 since = s.start
