@@ -54,8 +54,12 @@ public struct DayReport: Equatable, Sendable {
     public var blocks: [Block] = []
     /// One lane per category with time, largest first.
     public var lanes: [Lane] = []
+    /// Breaks to hatch in charts: AWAY and not-tracked periods, with ones
+    /// under 2 minutes apart joined and anything shorter than 2 minutes left
+    /// out (a few idle seconds are not a break worth drawing).
     public var away: [ClosedRange<Int64>] = []
     public var untracked: [ClosedRange<Int64>] = []
+    static let minBreak: Int64 = 120
     public var tracked: Int64 = 0
     public var awayTotal: Int64 = 0
     public var firstActivity: Int64?
@@ -105,6 +109,8 @@ public struct DayReport: Equatable, Sendable {
         var cache: [Int64: CategoryResolution] = [:]
         for s in clipped where s.kind == .active { cache[s.id] = resolve(s) }
         let category: (Segment) -> ActivityCategory = { cache[$0.id]?.category ?? .uncategorized }
+        away = DayReport.visibleBreaks(away)
+        untracked = DayReport.visibleBreaks(untracked)
         blocks = DayReport.blocks(from: clipped, resolution: { cache[$0.id]! })
         if isToday, let last = blocks.last, let open = clipped.last, open.kind == .active,
            last.segmentIDs.contains(open.id), now - open.end <= 15 {
@@ -120,9 +126,9 @@ public struct DayReport: Equatable, Sendable {
             laneTotals[c, default: 0] += s.duration
         }
         for b in blocks { laneBlocks[b.category, default: []].append(b) }
-        // A category with under a minute (a few glances) gets no lane; its
-        // seconds still count in `tracked`.
-        lanes = order.filter { laneTotals[$0]! >= DayReport.minBlock }
+        // A category needs at least one block (a minute or more in one go) to
+        // get a lane; a few glances still count in `tracked`.
+        lanes = order.filter { laneBlocks[$0] != nil }
             .map { Lane(category: $0, total: laneTotals[$0]!, blocks: laneBlocks[$0] ?? []) }
             .sorted { $0.total > $1.total }
 
@@ -228,6 +234,18 @@ public struct DayReport: Equatable, Sendable {
             if let c = cur, c.duration > (best?.duration ?? 0) { best = c }
         }
         return best.flatMap { $0.duration >= focusMinimum ? $0 : nil }
+    }
+
+    static func visibleBreaks(_ list: [ClosedRange<Int64>]) -> [ClosedRange<Int64>] {
+        var joined: [ClosedRange<Int64>] = []
+        for r in list {
+            if let last = joined.last, r.lowerBound - last.upperBound < minBreak {
+                joined[joined.count - 1] = last.lowerBound...max(last.upperBound, r.upperBound)
+            } else {
+                joined.append(r)
+            }
+        }
+        return joined.filter { $0.upperBound - $0.lowerBound >= minBreak }
     }
 
     private func append(_ list: inout [ClosedRange<Int64>], _ r: ClosedRange<Int64>) {

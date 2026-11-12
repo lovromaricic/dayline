@@ -100,7 +100,9 @@ struct TimelineChart: View {
             ForEach(hours, id: \.self) { h in
                 Rectangle().fill(Color.white.opacity(0.06)).frame(width: 1).offset(x: x(h, width))
             }
-            ForEach(Array((r.away + r.untracked).enumerated()), id: \.offset) { _, region in
+            // Stripes in a sliver look like noise; only hatch breaks wide enough to read.
+            ForEach(Array((r.away + r.untracked).filter { x($0.upperBound, width) - x($0.lowerBound, width) >= 10 }.enumerated()),
+                    id: \.offset) { _, region in
                 Hatch(color: Color.white.opacity(0.05), stripe: 3, period: 7)
                     .frame(width: max(1, x(region.upperBound, width) - x(region.lowerBound, width)))
                     .offset(x: x(region.lowerBound, width))

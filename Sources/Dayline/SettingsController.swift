@@ -5,11 +5,18 @@ import Store
 import SwiftUI
 import UI
 
-/// The Settings window (spec 5.4). ⌘, opens it from anywhere.
-final class SettingsWindowController {
+/// Settings (spec 5.4), shown inside the main window in place of the
+/// timeline. ⌘, opens it from anywhere.
+final class SettingsController {
     private let engine: TrackingEngine
     private let viewModel = SettingsViewModel()
-    private var window: NSWindow?
+    /// The page the main window swaps in; built once so it keeps its state.
+    private(set) lazy var view: NSView = {
+        let v = NSHostingView(rootView: SettingsView(viewModel: viewModel))
+        v.sizingOptions = []
+        return v
+    }()
+    private var window: NSWindow? { view.window }
     /// Rules or categories changed: refresh the timeline, popover and menu bar.
     var onChange: (() -> Void)?
     var onBack: (() -> Void)?
@@ -17,10 +24,7 @@ final class SettingsWindowController {
     init(engine: TrackingEngine) {
         self.engine = engine
         let db = engine.database
-        viewModel.onBack = { [weak self] in
-            self?.window?.close()
-            self?.onBack?()
-        }
+        viewModel.onBack = { [weak self] in self?.onBack?() }
         viewModel.onAddRule = { [weak self] kind, pattern, categoryID in
             self?.write { try db.addRule(kind: kind, pattern: pattern, categoryID: categoryID, origin: .user, at: TrackingEngine.now()) }
         }
@@ -110,12 +114,10 @@ final class SettingsWindowController {
         return alert.runModal() == .alertSecondButtonReturn
     }
 
-    func show(section: SettingsSection = .general) {
-        if window == nil { window = makeWindow() }
+    /// Fresh values before the page is shown.
+    func prepare(section: SettingsSection = .general) {
         viewModel.section = section
         reload()
-        NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
     }
 
     private func write(_ change: () throws -> Void) {
@@ -174,21 +176,5 @@ final class SettingsWindowController {
     private func appName(_ bundleID: String) -> String {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
             .map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") } ?? bundleID
-    }
-
-    private func makeWindow() -> NSWindow {
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 720),
-                         styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                         backing: .buffered, defer: false)
-        w.titlebarAppearsTransparent = true
-        w.titleVisibility = .hidden
-        w.title = "Dayline Settings"
-        w.appearance = NSAppearance(named: .darkAqua)
-        w.backgroundColor = NSColor(srgbRed: 0x10 / 255, green: 0x11 / 255, blue: 0x13 / 255, alpha: 1)
-        w.isReleasedWhenClosed = false
-        w.contentView = NSHostingView(rootView: SettingsView(viewModel: viewModel))
-        w.setFrameAutosaveName("DaylineSettings")
-        if !w.setFrameUsingName("DaylineSettings") { w.center() }
-        return w
     }
 }

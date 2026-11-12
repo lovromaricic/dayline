@@ -151,7 +151,6 @@ public struct SettingsView: View {
                 .accessibilityAddTraits(vm.section == s ? .isSelected : [])
             }
             Spacer()
-            Text("Close with ⌘W").font(.system(size: 12)).foregroundStyle(Theme.textMuted).padding(.horizontal, 12)
         }
         .padding(16)
         .frame(width: 220)

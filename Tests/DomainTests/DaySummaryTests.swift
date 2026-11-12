@@ -7,7 +7,7 @@ import Testing
     func at(_ h: Int, _ m: Int = 0) -> Int64 { day + Int64(h * 3600 + m * 60) }
 
     func seg(_ s: Int64, _ e: Int64, _ kind: SegmentKind = .active, app: String = "x", domain: String? = nil, title: String? = nil) -> Segment {
-        Segment(id: 0, start: s, end: e, kind: kind, appBundleID: app, appName: app, title: title, domain: domain)
+        Segment(id: s, start: s, end: e, kind: kind, appBundleID: app, appName: app, title: title, domain: domain)
     }
 
     func cat(_ s: Segment) -> ActivityCategory { s.appBundleID == "xcode" ? .development : .browsing }
@@ -23,7 +23,7 @@ import Testing
         let d = DaySummary(segments: segs, dayStart: day, now: at(10, 20), category: cat)
         #expect(d.tracked == 3600)
         #expect(d.away == 900)
-        #expect(d.rails.map(\.category) == [.development, .browsing])
+        #expect(d.rails.map(\.category) == [.development])  // 40 s of browsing gets no rail, as in the timeline
         #expect(d.rails[0].bars == [at(9)...at(10)])
         #expect(d.untracked == [at(10, 15)...at(10, 20)])
         #expect(d.axis == at(8)...at(17))
@@ -54,5 +54,24 @@ import Testing
     @Test(arguments: [(0, "0m"), (59, "0m"), (3120, "52m"), (7200, "2h 00m"), (24300, "6h 45m")])
     func durations(seconds: Int64, text: String) {
         #expect(Durations.format(seconds) == text)
+    }
+}
+
+extension DaySummaryTests {
+    /// The popover and the timeline must agree on lanes and totals.
+    @Test func popoverMatchesTimeline() {
+        let segs = [
+            seg(at(9), at(9, 30), app: "xcode"),
+            seg(at(9, 30), at(9, 30) + 20, app: "chrome"),   // a 20 s glance
+            seg(at(9, 30) + 20, at(10), app: "xcode"),
+            seg(at(10), at(10, 20), app: "chrome"),
+        ]
+        let report = DayReport(segments: segs, dayStart: day, now: at(10, 20), category: cat)
+        let summary = DaySummary(report: report)
+        #expect(summary.rails.map(\.category) == report.lanes.map(\.category))
+        #expect(summary.rails.map(\.total) == report.lanes.map(\.total))
+        #expect(summary.rails.flatMap(\.bars) == report.lanes.flatMap { $0.blocks.map { $0.start...$0.end } })
+        #expect(summary.tracked == report.tracked)
+        #expect(summary.axis == report.axis)
     }
 }

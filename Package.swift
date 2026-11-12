@@ -25,7 +25,7 @@ let package = Package(
         // The menu bar app: wires capture, store, categorizer and UI together.
         .executableTarget(name: "Dayline", dependencies: ["Domain", "Capture", "Categorize", "Store", "UI"]),
         // Renders the popover in every state to PNG, for design review.
-        .executableTarget(name: "ui-snapshots", dependencies: ["Domain", "UI"]),
+        .executableTarget(name: "ui-snapshots", dependencies: ["Domain", "UI", "Store", "Categorize"]),
         // Prints a day's segments from the database.
         .executableTarget(name: "dayline-report", dependencies: ["Domain", "Store"]),
         .testTarget(name: "DomainTests", dependencies: ["Domain"]),

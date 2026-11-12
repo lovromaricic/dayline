@@ -24,8 +24,11 @@ public struct PopoverView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            header
-            total
+            // The total sits close under the status line; 18 pt elsewhere.
+            VStack(alignment: .leading, spacing: 2) {
+                header
+                total
+            }
             card
             if hasData && m.phase != .needsPermission && m.phase != .waitingForPermission {
                 DayBarcode(summary: m.summary, nowLine: m.phase == .tracking ? m.now : nil)
@@ -46,19 +49,12 @@ public struct PopoverView: View {
 
     private var header: some View {
         HStack {
-            HStack(spacing: 8) {
-                Circle().fill(statusDot).frame(width: 7, height: 7)
-                Text(statusText).eyebrow()
-            }
-            .accessibilityElement(children: .combine)
+            Text(statusText).eyebrow()
             Spacer()
             switch m.phase {
             case .tracking:
                 Button(action: { actions.pause(.untilResumed) }) {
-                    PauseGlyph().frame(width: 16, height: 16)
-                        .frame(width: 44, height: 44)
-                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border))
-                        .contentShape(Rectangle())
+                    headerButton("Pause") { PauseGlyph().frame(width: 14, height: 14) }
                 }
                 .buttonStyle(.plain)
                 .help("Pause tracking. Right-click for more options.")
@@ -66,24 +62,31 @@ public struct PopoverView: View {
                 .contextMenu { pauseMenu }
             case .paused:
                 Button(action: actions.resume) {
-                    HStack(spacing: 8) {
-                        PlayGlyph().frame(width: 14, height: 14)
-                        Text("Resume").font(.system(size: 14, weight: .semibold))
-                    }
-                    .padding(.leading, 14).padding(.trailing, 16)
-                    .frame(height: 44)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Theme.accent.opacity(0.10)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.accent.opacity(0.45)))
-                    .contentShape(Rectangle())
+                    headerButton("Resume") { PlayGlyph().frame(width: 12, height: 12) }
                 }
                 .buttonStyle(.plain)
+                .help("Resume tracking")
                 .accessibilityLabel("Resume tracking")
                 .contextMenu { pauseMenu }
             default:
                 EmptyView()
             }
+            settingsButton
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: 36)
+    }
+
+    /// Pause and Resume share one look: icon and label in a bordered button.
+    private func headerButton(_ label: String, @ViewBuilder icon: () -> some View) -> some View {
+        HStack(spacing: 8) {
+            icon()
+            Text(label).font(.system(size: 13, weight: .medium))
+        }
+        .padding(.leading, 12).padding(.trailing, 14)
+        .frame(height: 36)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border))
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder private var pauseMenu: some View {
@@ -102,26 +105,19 @@ public struct PopoverView: View {
         }
     }
 
-    private var statusDot: Color {
-        switch m.phase {
-        case .tracking: Theme.ok
-        case .permissionLost: Theme.danger
-        default: Color.white.opacity(0.3)
-        }
-    }
-
     // MARK: - Total
 
     private var total: some View {
         let muted = m.phase == .needsPermission || m.phase == .waitingForPermission
-        return VStack(alignment: .leading, spacing: 4) {
+        // Negative spacing: the 64 pt line has room for descenders the digits never use.
+        return VStack(alignment: .leading, spacing: -6) {
             Text(Durations.format(m.summary.tracked))
                 .font(.system(size: 64, weight: .light).monospacedDigit())
                 .tracking(-1.92)
                 .foregroundStyle(muted ? Color(hex: 0xF4F3F7, opacity: 0.32) : Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            Text("tracked today").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+            Text("Tracked today").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
         }
         .accessibilityElement(children: .combine)
     }
@@ -214,27 +210,29 @@ public struct PopoverView: View {
     // MARK: - Buttons
 
     private var buttons: some View {
-        HStack(spacing: 8) {
-            Button(action: primaryAction) {
-                Text(primaryTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.onAccent)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Theme.accent))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.defaultAction)
-            Button(action: actions.openSettings) {
-                SlidersGlyph()
-                    .frame(width: 48, height: 48)
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Settings")
-            .accessibilityLabel("Settings")
+        Button(action: primaryAction) {
+            Text(primaryTitle)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.onAccent)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.accent))
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .keyboardShortcut(.defaultAction)
+    }
+
+    private var settingsButton: some View {
+        Button(action: actions.openSettings) {
+            SlidersGlyph()
+                .frame(width: 36, height: 36)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Theme.cardFill))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Settings")
+        .accessibilityLabel("Settings")
     }
 
     private var primaryTitle: String {

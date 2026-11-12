@@ -62,10 +62,10 @@ struct OnboardingView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: -6) {
                 Text("0m").font(.system(size: 64, weight: .light).monospacedDigit()).tracking(-1.92)
                     .foregroundStyle(Color(hex: 0xF4F3F7, opacity: 0.32))
-                Text("tracked today").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                Text("Tracked today").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
             }
             .accessibilityElement(children: .combine)
         }

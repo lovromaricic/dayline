@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nowStatus: .none, now: 0))
     private var refreshTimer: Timer?
     private var timeline: TimelineWindowController!
-    private var settings: SettingsWindowController!
+    private var settings: SettingsController!
 
     func applicationDidFinishLaunching(_ note: Notification) {
         let database: DaylineDatabase
@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timeline = TimelineWindowController(engine: engine)
         timeline.onOpenSettings = { [weak self] in self?.openSettings() }
         timeline.onRulesChanged = { [weak self] in self?.refresh() }
-        settings = SettingsWindowController(engine: engine)
+        settings = SettingsController(engine: engine)
         settings.onChange = { [weak self] in
             self?.refresh()
             self?.timeline.refresh()
@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let dayStart = Int64(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)
         let segments = (try? engine.store.segments(from: dayStart, to: dayStart + 86_400)) ?? []
         let categorizer = engine.categorizer
-        let summary = DaySummary(segments: segments, dayStart: dayStart, now: now, category: categorizer.category(for:))
+        let summary = DaySummary(segments: segments, dayStart: dayStart, now: now, resolve: { categorizer.resolve($0) })
         let model = PopoverModel(phase: engine.phase, summary: summary, nowStatus: engine.nowStatus, now: now)
         if model != popoverModel.model { popoverModel.model = model }
         statusItem.update(phase: engine.phase, tracked: summary.tracked, showTotal: engine.showTotalInMenuBar)
@@ -95,7 +95,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         statusItem.closePopover()
-        settings.show()
+        settings.prepare()
+        timeline.show(settings: settings.view)
     }
 }
 

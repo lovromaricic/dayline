@@ -2,7 +2,8 @@ import AppKit
 import Domain
 
 /// The menu bar ring + total (spec 5.1). Drawn with dynamic colors so the
-/// track and muted text follow a light or dark menu bar.
+/// track (white on a dark menu bar, black on a light one) and muted text
+/// follow the menu bar.
 public enum MenuBarIcon {
     /// Ring fill is today's tracked time against 8 h (not a goal).
     public static let target: Int64 = 8 * 3600
@@ -15,7 +16,7 @@ public enum MenuBarIcon {
             circle.lineWidth = 2.4
             switch phase {
             case .tracking:
-                NSColor.labelColor.withAlphaComponent(0.18).setStroke()
+                NSColor.labelColor.setStroke()
                 circle.stroke()
                 if fraction > 0 {
                     let arc = NSBezierPath()
@@ -23,10 +24,10 @@ public enum MenuBarIcon {
                     arc.lineWidth = 2.4
                     arc.lineCapStyle = .round
                     let shadow = NSShadow()
-                    shadow.shadowColor = NSColor(hex: 0x4EA7FC)
+                    shadow.shadowColor = NSColor(hex: 0xD1FE17)
                     shadow.shadowBlurRadius = 3
                     shadow.set()
-                    NSColor(hex: 0x4EA7FC).setStroke()
+                    NSColor(hex: 0xD1FE17).setStroke()
                     arc.stroke()
                 }
             case .paused:

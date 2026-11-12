@@ -130,3 +130,33 @@ extension DayReportTests {
         #expect(r.headline(trackingNow: false).0 == "Mostly Development so far,")
     }
 }
+
+extension DayReportTests {
+    @Test mutating func shortBreaksAreJoinedOrHidden() {
+        let r = report([
+            seg(at(9), at(9, 10)),
+            seg(at(9, 10), at(9, 10, 30), "", .away),      // 30 s: too short to draw
+            seg(at(9, 10, 30), at(9, 20)),
+            seg(at(9, 20), at(9, 21, 30), "", .away),      // 90 s, then 60 s later another 90 s:
+            seg(at(9, 21, 30), at(9, 22, 30)),
+            seg(at(9, 22, 30), at(9, 24), "", .away),      // joined into one 4-minute break
+            seg(at(9, 24), at(9, 40)),
+        ])
+        #expect(r.away == [at(9, 20)...at(9, 24)])
+        #expect(r.awayTotal == 30 + 90 + 90)               // totals still count every second
+    }
+}
+
+extension DayReportTests {
+    @Test mutating func glancesAddingUpToAMinuteGetNoLane() {
+        let r = report([
+            seg(at(9), at(9, 10)),
+            seg(at(9, 10), at(9, 10, 40), "slack"),
+            seg(at(9, 10, 40), at(9, 20)),
+            seg(at(9, 20), at(9, 20, 40), "slack"),   // 80 s of Slack in total, never a minute at once
+            seg(at(9, 20, 40), at(9, 30)),
+        ])
+        #expect(r.lanes.map(\.category) == [.development])
+        #expect(r.tracked == 30 * 60)
+    }
+}

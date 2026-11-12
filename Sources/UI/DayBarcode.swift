@@ -39,10 +39,11 @@ struct DayBarcode: View {
             ForEach(Array(rail.bars.enumerated()), id: \.offset) { _, bar in
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color(hexString: rail.category.color))
-                    .frame(width: max(x(bar.upperBound, width) - x(bar.lowerBound, width), 6))
+                    .frame(width: max(x(bar.upperBound, width) - x(bar.lowerBound, width), 3))
                     .offset(x: x(bar.lowerBound, width))
             }
-            ForEach(Array(summary.untracked.enumerated()), id: \.offset) { _, gap in
+            ForEach(Array(summary.untracked.filter { x($0.upperBound, width) - x($0.lowerBound, width) >= 6 }.enumerated()),
+                    id: \.offset) { _, gap in
                 Hatch(color: Theme.border, stripe: 2, period: 5)
                     .frame(width: max(x(gap.upperBound, width) - x(gap.lowerBound, width), 2))
                     .offset(x: x(gap.lowerBound, width))

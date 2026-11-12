@@ -4,10 +4,12 @@ import SwiftUI
 import UI
 
 /// The main window. Loads a day's segments into a DayReport and keeps today live.
+/// Settings open in the same window, in place of the timeline.
 final class TimelineWindowController: NSObject, NSWindowDelegate {
     private let engine: TrackingEngine
     private let viewModel: HomeViewModel
     private var window: NSWindow?
+    private var homeView: NSView?
     private var timer: Timer?
     private(set) var dayStart: Int64
     /// The day's segments as last loaded, for corrections.
@@ -106,17 +108,32 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         onRulesChanged?()
     }
 
-    var isVisible: Bool { window?.isVisible ?? false }
+    /// The timeline is on screen (not hidden behind the settings page).
+    var isVisible: Bool { (window?.isVisible ?? false) && window?.contentView === homeView }
 
     func show() {
         if window == nil { window = makeWindow() }
         // Reopening jumps back to today.
         if !(window?.isVisible ?? false) { dayStart = Self.startOfDay(Date()) }
+        if window?.contentView !== homeView { window?.contentView = homeView }
         reload()
-        NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
+        bringToFront()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.tick() }
+    }
+
+    /// Swaps the settings page in; Back to Dayline calls `show()`.
+    func show(settings view: NSView) {
+        if window == nil { window = makeWindow() }
+        if window?.contentView !== view { window?.contentView = view }
+        timer?.invalidate()
+        timer = nil
+        bringToFront()
+    }
+
+    private func bringToFront() {
+        NSApp.activate()
+        window?.makeKeyAndOrderFront(nil)
     }
 
     /// Segment, rule or category changes while the window is open.
@@ -165,7 +182,11 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         w.isReleasedWhenClosed = false
         w.isMovableByWindowBackground = true
         w.contentMinSize = NSSize(width: 1000, height: 640)
-        w.contentView = NSHostingView(rootView: HomeView(viewModel: viewModel))
+        let home = NSHostingView(rootView: HomeView(viewModel: viewModel))
+        // Swapping pages must not resize the window.
+        home.sizingOptions = []
+        homeView = home
+        w.contentView = home
         w.setFrameAutosaveName("DaylineMain")
         if !w.setFrameUsingName("DaylineMain") { w.center() }
         w.delegate = self

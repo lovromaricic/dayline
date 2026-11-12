@@ -1,4 +1,6 @@
 import AppKit
+import Categorize
+import Store
 import Domain
 import SwiftUI
 import UI
@@ -6,7 +8,9 @@ import UI
 // Renders the popover in every state with sample data, for comparing
 // against design/screens. Usage: ui-snapshots [output-dir]
 
-let out = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? "build/snapshots")
+// --today renders your real day from the Dayline database (stays in build/, git-ignored).
+let realDay = CommandLine.arguments.contains("--today")
+let out = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first { !$0.hasPrefix("--") } ?? "build/snapshots")
 try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
 
 let cal = Calendar.current
@@ -121,5 +125,26 @@ MainActor.assumeIsolated {
         let rep = NSBitmapImageRep(cgImage: cg)
         try! rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "\(name).png"))
         print("wrote \(name).png")
+    }
+}
+
+if realDay {
+    MainActor.assumeIsolated {
+        let db = try! DaylineDatabase()
+        var categorizer = Categorizer(categories: (try? db.categories()) ?? [], rules: (try? db.rules()) ?? [])
+        categorizer.aliases = (try? db.categoryAliases()) ?? [:]
+        let now = Int64(Date().timeIntervalSince1970)
+        let segs = (try? SegmentStore(database: db).segments(from: dayStart, to: dayStart + 86_400)) ?? []
+        let report = DayReport(segments: segs, dayStart: dayStart, now: now, resolve: { categorizer.resolve($0) })
+        let pop = PopoverView(viewModel: PopoverViewModel(model: PopoverModel(phase: .tracking, summary: DaySummary(report: report),
+                                                                              nowStatus: .none, now: now)), actions: noop)
+            .padding(24).background(Theme.bg)
+        let home = HomeView(viewModel: HomeViewModel(report: report), scrolls: false).frame(width: 1200, height: 716)
+        for (name, view) in [("real-popover", AnyView(pop)), ("real-home", AnyView(home))] {
+            let r = ImageRenderer(content: view)
+            r.scale = 2
+            try! NSBitmapImageRep(cgImage: r.cgImage!).representation(using: .png, properties: [:])!.write(to: out.appending(path: "\(name).png"))
+            print("wrote \(name).png")
+        }
     }
 }
