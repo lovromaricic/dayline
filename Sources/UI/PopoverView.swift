@@ -133,9 +133,20 @@ public struct PopoverView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .frame(height: 56, alignment: .top)
-            Text("Tracked today").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+            caption.font(.system(size: 13)).foregroundStyle(Theme.textMuted)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// "Tracked today", plus a note in the ring's colour on a long day.
+    private var caption: Text {
+        let note: (String, Color)? = switch m.summary.length {
+        case .normal: nil
+        case .long: ("a long day", Theme.long)
+        case .veryLong: ("over 10 hours", Theme.veryLong)
+        }
+        guard let note, m.phase == .tracking || isPaused else { return Text("Tracked today") }
+        return Text("Tracked today · ") + Text(note.0).foregroundColor(note.1)
     }
 
     // MARK: - Card

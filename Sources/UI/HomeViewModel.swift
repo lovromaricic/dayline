@@ -15,21 +15,27 @@ public struct Correction: Equatable, Sendable {
     /// What the prompt calls it: the host, or the app's name.
     public var subject: String
     public var category: ActivityCategory
+    /// The block's category before the change, for Cancel.
+    public var previous: ActivityCategory
 
-    public init(blockID: Int64, kind: Rule.Kind, pattern: String, subject: String, category: ActivityCategory) {
+    public init(blockID: Int64, kind: Rule.Kind, pattern: String, subject: String, category: ActivityCategory,
+                previous: ActivityCategory) {
         self.blockID = blockID
         self.kind = kind
         self.pattern = pattern
         self.subject = subject
         self.category = category
+        self.previous = previous
     }
 
     /// Browser blocks are about the site; everything else about the app.
     public static func subject(for b: Block, category: ActivityCategory) -> Correction {
         if let host = b.host {
-            return Correction(blockID: b.id, kind: .site, pattern: host, subject: host, category: category)
+            return Correction(blockID: b.id, kind: .site, pattern: host, subject: host, category: category,
+                              previous: b.category)
         }
-        return Correction(blockID: b.id, kind: .app, pattern: b.appBundleID, subject: b.appName, category: category)
+        return Correction(blockID: b.id, kind: .app, pattern: b.appBundleID, subject: b.appName, category: category,
+                          previous: b.category)
     }
 }
 
@@ -84,6 +90,13 @@ public final class HomeViewModel: ObservableObject {
         guard let c = pendingCorrection else { return }
         onAlways?(c)
         pendingCorrection = nil
+    }
+
+    /// Cancel: put the block back in the category it had before the change.
+    public func cancelCorrection() {
+        guard let c = pendingCorrection else { return }
+        pendingCorrection = nil
+        if let b = report.blocks.first(where: { $0.id == c.blockID }) { onSetCategory?(b, c.previous) }
     }
 
     public init(report: DayReport) {

@@ -31,9 +31,10 @@ struct Inspector: View {
                     .padding(.top, 6)
                 Text(Fmt.longDuration(b.duration)).font(.system(size: 13)).foregroundStyle(Theme.textMuted)
             }
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 field("App", b.appName)
-                if let title = b.title {
+                // "App: Claude, Window title: Claude" says nothing twice.
+                if let title = b.title, title != b.appName {
                     field(b.host == nil ? "Window title" : "Tab title", title)
                 }
                 if let host = b.host { field("Site", host) }
@@ -88,22 +89,31 @@ struct Inspector: View {
                 .font(.system(size: 14, weight: .medium))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
+            // Equal halves; Just this time takes the card's own lime border.
             HStack(spacing: 8) {
                 Button(action: vm.always) {
                     Text("Always").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.onAccent)
-                        .padding(.horizontal, 16).frame(height: 40)
+                        .frame(maxWidth: .infinity, minHeight: 40)
                         .background(RoundedRectangle(cornerRadius: 6).fill(Theme.accent))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 Button(action: { vm.pendingCorrection = nil }) {
-                    Text("Just this block").font(.system(size: 14))
-                        .padding(.horizontal, 16).frame(height: 40)
-                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
+                    Text("Just this time").font(.system(size: 14))
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.accent.opacity(0.35)))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
+            // Three buttons do not fit the inspector; Cancel is a plain text button.
+            Button(action: vm.cancelCorrection) {
+                Text("Cancel").font(.system(size: 13)).foregroundStyle(Theme.text)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .help("Put the block back in \(c.previous.name)")
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,11 +122,11 @@ struct Inspector: View {
     }
 
     private func field(_ label: String, _ value: String, dot: Color? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.system(size: 12)).foregroundStyle(Theme.textMuted)
             HStack(spacing: 8) {
                 if let dot { Circle().fill(dot).frame(width: 8, height: 8) }
-                Text(value).font(.system(size: 16)).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                Text(value).font(.system(size: 14)).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
             }
         }
         .accessibilityElement(children: .combine)
@@ -126,8 +136,6 @@ struct Inspector: View {
 
     private var empty: some View {
         VStack(alignment: .leading, spacing: 28) {
-            Text("Click a block to inspect it or fix its category.")
-                .font(.system(size: 13)).foregroundStyle(Theme.textMuted).lineSpacing(2)
             if !vm.report.topApps.isEmpty {
                 VStack(alignment: .leading, spacing: 14) {
                     Text(vm.report.isToday ? "TOP APPS TODAY" : "TOP APPS").eyebrow()
@@ -158,11 +166,14 @@ struct Inspector: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("LONGEST FOCUS").eyebrow()
                 if let f = vm.report.longestFocus {
-                    Text("\(Durations.format(f.duration)) in \(f.appName)").font(.system(size: 22, weight: .light)).padding(.top, 4)
-                    Text([Fmt.range(f.start, f.end), f.title].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: 13)).foregroundStyle(Theme.textMuted).lineLimit(2)
+                    // Same headline style as the selected block's time range.
+                    Text(Durations.format(f.duration)).font(.system(size: 26, weight: .light).monospacedDigit()).padding(.top, 6)
+                    Text("in \(f.appName) · \(Fmt.range(f.start, f.end))").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                    if let t = f.title {
+                        Text(t).font(.system(size: 13)).foregroundStyle(Theme.textMuted).lineLimit(1).truncationMode(.tail)
+                    }
                 } else {
-                    Text("Not enough yet").font(.system(size: 22, weight: .light)).padding(.top, 4)
+                    Text("Not enough yet").font(.system(size: 26, weight: .light)).padding(.top, 6)
                     Text("Stretches of 25 minutes or more in one app show up here.")
                         .font(.system(size: 13)).foregroundStyle(Theme.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -173,6 +184,9 @@ struct Inspector: View {
             .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
             .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
+            // A first-run hint, so it sits at the bottom rather than above the data.
+            Text("Click a block to inspect it or fix its category.")
+                .font(.system(size: 12)).foregroundStyle(Theme.textFaint).lineSpacing(2)
         }
     }
 }

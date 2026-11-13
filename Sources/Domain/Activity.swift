@@ -55,7 +55,7 @@ public struct Segment: Equatable, Sendable {
     public var host: String?
     public var domain: String?
     public var call: Bool
-    /// Set by a manual correction ("Just this block"); nil otherwise.
+    /// Set by a manual correction ("Just this time"); nil otherwise.
     public var manualCategoryID: Int64?
 
     public init(id: Int64, start: Int64, end: Int64, kind: SegmentKind, appBundleID: String = "", appName: String = "",

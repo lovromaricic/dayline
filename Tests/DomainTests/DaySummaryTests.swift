@@ -59,6 +59,17 @@ import Testing
 
 extension DaySummaryTests {
     /// The popover and the timeline must agree on lanes and totals.
+    @Test func longDayLeavesOutEntertainment() {
+        #expect(DayLength(tracked: 9 * 3600 - 60) == .normal)
+        #expect(DayLength(tracked: 9 * 3600) == .long)
+        #expect(DayLength(tracked: 10 * 3600) == .veryLong)
+        // 9 h 30 m of Xcode plus a 1 h film: still only a long day.
+        let segs = [seg(at(8), at(17, 30), app: "xcode"), seg(at(19), at(20), app: "tv")]
+        let summary = DaySummary(segments: segs, dayStart: day, now: at(20)) { $0.appBundleID == "tv" ? .entertainment : .development }
+        #expect(summary.tracked == 10 * 3600 + 30 * 60)
+        #expect(summary.length == .long)
+    }
+
     @Test func popoverMatchesTimeline() {
         let segs = [
             seg(at(9), at(9, 30), app: "xcode"),

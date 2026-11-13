@@ -6,6 +6,9 @@ struct BlocksList: View {
     @ObservedObject var vm: HomeViewModel
     var searchFocus: FocusState<Bool>.Binding
 
+    /// The scroll target for a block's row in the list.
+    static func rowID(_ id: Int64) -> String { "row-\(id)" }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 16) {
@@ -61,7 +64,9 @@ struct BlocksList: View {
                         .onTapGesture { vm.select(vm.selection == b.id ? nil : b.id) }
                         .accessibilityAction { vm.select(vm.selection == b.id ? nil : b.id) }
                         .accessibilityHint(vm.selection == b.id ? "Deselects the block" : "Shows the block in the inspector")
-                        .id(b.id)
+                        // Chart bars carry the block id too; the row's own id keeps
+                        // scrollTo from jumping up to the chart.
+                        .id(BlocksList.rowID(b.id))
                 }
                 if !vm.isFiltering, vm.filteredBlocks.count > HomeViewModel.collapsedCount {
                     Button(vm.showAllBlocks ? "Show fewer" : "Show all \(vm.filteredBlocks.count) blocks") {
@@ -69,7 +74,7 @@ struct BlocksList: View {
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 13))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.text)
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }

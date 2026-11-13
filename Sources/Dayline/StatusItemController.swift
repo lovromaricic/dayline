@@ -1,4 +1,5 @@
 import AppKit
+import Domain
 import SwiftUI
 import UI
 
@@ -23,13 +24,13 @@ final class StatusItemController: NSObject {
         panel.onClose = { [weak self] in self?.stopClickMonitor() }
     }
 
-    func update(phase: TrackingPhase, tracked: Int64, showTotal: Bool) {
+    func update(phase: TrackingPhase, tracked: Int64, length: DayLength, showTotal: Bool) {
         guard let button = statusItem.button else { return }
-        button.image = MenuBarIcon.image(phase: phase, tracked: tracked)
+        button.image = MenuBarIcon.image(phase: phase, tracked: tracked, length: length)
         // Setting "Show today's total in the menu bar": off leaves the ring alone.
         button.attributedTitle = showTotal ? MenuBarIcon.title(phase: phase, tracked: tracked) : NSAttributedString()
         button.imagePosition = showTotal ? .imageLeading : .imageOnly
-        button.setAccessibilityLabel(MenuBarIcon.accessibilityLabel(phase: phase, tracked: tracked))
+        button.setAccessibilityLabel(MenuBarIcon.accessibilityLabel(phase: phase, tracked: tracked, length: length))
     }
 
     var isPopoverShown: Bool { panel.isVisible }

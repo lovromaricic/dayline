@@ -20,6 +20,8 @@ public struct DaySummary: Equatable, Sendable {
 
     public var tracked: Int64
     public var away: Int64
+    /// Past 9 h or 10 h, for the menu bar ring and the popover note.
+    public var length: DayLength
     /// One rail per timeline lane (categories with a minute or more), largest first.
     public var rails: [Rail]
     public var untracked: [ClosedRange<Int64>]
@@ -34,6 +36,9 @@ public struct DaySummary: Equatable, Sendable {
         untracked = r.untracked
         axis = r.axis
         current = r.current
+        // Films and music in the evening do not make a long working day.
+        let entertainment = rails.first { $0.category.id == ActivityCategory.entertainment.id }?.total ?? 0
+        length = DayLength(tracked: tracked - entertainment)
     }
 
     public init(segments: [Segment], dayStart: Int64, now: Int64, category: (Segment) -> ActivityCategory) {
@@ -42,6 +47,19 @@ public struct DaySummary: Equatable, Sendable {
 
     public init(segments: [Segment], dayStart: Int64, now: Int64, resolve: (Segment) -> CategoryResolution) {
         self.init(report: DayReport(segments: segments, dayStart: dayStart, now: now, resolve: resolve))
+    }
+}
+
+/// Spec 5.1: the ring stays lime up to 9 h, turns amber for a long day and
+/// red past 10 h. Entertainment does not count.
+public enum DayLength: Equatable, Sendable {
+    case normal, long, veryLong
+
+    public static let longAfter: Int64 = 9 * 3600
+    public static let veryLongAfter: Int64 = 10 * 3600
+
+    public init(tracked: Int64) {
+        self = tracked >= Self.veryLongAfter ? .veryLong : tracked >= Self.longAfter ? .long : .normal
     }
 }
 

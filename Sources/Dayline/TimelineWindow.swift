@@ -79,7 +79,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         if isVisible { reload() }
     }
 
-    /// "Just this block": pin the block's segments to the category. Picking
+    /// "Just this time": pin the block's segments to the category. Picking
     /// what the rules would give anyway clears the pin instead.
     private func setCategory(_ block: Block, _ category: ActivityCategory) {
         let ids = Set(block.segmentIDs)
@@ -193,7 +193,6 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         w.appearance = NSAppearance(named: .darkAqua)
         w.backgroundColor = NSColor(srgbRed: 0x10 / 255, green: 0x11 / 255, blue: 0x13 / 255, alpha: 1)
         w.isReleasedWhenClosed = false
-        w.isMovableByWindowBackground = true
         w.contentMinSize = NSSize(width: 1000, height: 640)
         let home = NSHostingView(rootView: HomeView(viewModel: viewModel))
         // Swapping pages must not resize the window.

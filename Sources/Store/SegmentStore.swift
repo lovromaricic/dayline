@@ -53,7 +53,7 @@ public final class SegmentStore {
         }
     }
 
-    /// "Just this block": pin these segments to a category, or `nil` to undo.
+    /// "Just this time": pin these segments to a category, or `nil` to undo.
     public func setManualCategory(segmentIDs: [Int64], categoryID: Int64?) throws {
         guard !segmentIDs.isEmpty else { return }
         let marks = segmentIDs.map { _ in "?" }.joined(separator: ",")

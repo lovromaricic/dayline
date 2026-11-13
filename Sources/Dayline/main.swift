@@ -90,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 popoverModel.model = model
             }
         }
-        statusItem.update(phase: engine.phase, tracked: summary.tracked, showTotal: engine.showTotalInMenuBar)
+        statusItem.update(phase: engine.phase, tracked: summary.tracked, length: summary.length, showTotal: engine.showTotalInMenuBar)
         DispatchQueue.main.async { self.statusItem.refitPopover() }
     }
 

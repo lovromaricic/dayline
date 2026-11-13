@@ -53,7 +53,7 @@ public struct HomeView: View {
                     ScrollViewReader { proxy in
                         ScrollView { content }
                             .onChange(of: vm.selection) { _, id in
-                                if let id { withAnimation(nil) { proxy.scrollTo(id) } }
+                                if let id { withAnimation(nil) { proxy.scrollTo(BlocksList.rowID(id)) } }
                             }
                     }
                 } else {

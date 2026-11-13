@@ -8,7 +8,16 @@ public enum MenuBarIcon {
     /// Ring fill is today's tracked time against 8 h (not a goal).
     public static let target: Int64 = 8 * 3600
 
-    public static func image(phase: TrackingPhase, tracked: Int64) -> NSImage {
+    /// The arc's colour: lime, then amber for a long day, red past 10 h.
+    static func arcColor(_ length: DayLength) -> NSColor {
+        switch length {
+        case .normal: NSColor(hex: 0xD1FE17)
+        case .long: NSColor(hex: 0xFFB547)
+        case .veryLong: NSColor(hex: 0xFF5A4E)
+        }
+    }
+
+    public static func image(phase: TrackingPhase, tracked: Int64, length: DayLength = .normal) -> NSImage {
         let fraction = min(1, Double(tracked) / Double(target))
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
             let center = NSPoint(x: 9, y: 9), r: CGFloat = 6.5
@@ -24,10 +33,10 @@ public enum MenuBarIcon {
                     arc.lineWidth = 2.4
                     arc.lineCapStyle = .round
                     let shadow = NSShadow()
-                    shadow.shadowColor = NSColor(hex: 0xD1FE17)
+                    shadow.shadowColor = arcColor(length)
                     shadow.shadowBlurRadius = 3
                     shadow.set()
-                    NSColor(hex: 0xD1FE17).setStroke()
+                    arcColor(length).setStroke()
                     arc.stroke()
                 }
             case .paused:
@@ -60,14 +69,19 @@ public enum MenuBarIcon {
     }
 
     /// VoiceOver label for the status item.
-    public static func accessibilityLabel(phase: TrackingPhase, tracked: Int64) -> String {
+    public static func accessibilityLabel(phase: TrackingPhase, tracked: Int64, length: DayLength = .normal) -> String {
         let state = switch phase {
         case .tracking: "tracking"
         case .paused: "paused"
         case .needsPermission, .waitingForPermission: "needs Accessibility access"
         case .permissionLost: "tracking stopped, Accessibility access was turned off"
         }
-        return "Dayline, \(Durations.format(tracked)) today, \(state)"
+        let note = switch length {
+        case .normal: ""
+        case .long: ", a long day"
+        case .veryLong: ", over 10 hours"
+        }
+        return "Dayline, \(Durations.format(tracked)) today\(note), \(state)"
     }
 }
 

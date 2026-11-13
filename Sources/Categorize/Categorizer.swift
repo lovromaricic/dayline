@@ -1,7 +1,7 @@
 import Domain
 
 /// Resolution order (spec section 4), first match wins:
-/// 1. a manual correction on the segment ("Just this block")
+/// 1. a manual correction on the segment ("Just this time")
 /// 2. your rules, newest first within a kind; kinds in order site, app, title
 /// 3. a call (mic/camera in use) counts as Meetings when that setting is on
 /// 4. built-in rules (BuiltinRules.swift)

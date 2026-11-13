@@ -15,6 +15,9 @@ public enum Theme {
     public static let onAccent = Color(hex: 0x0B0D00)
     public static let danger = Color(hex: 0xEB5757)
     public static let ok = Color(hex: 0x00B8CC)
+    /// The menu bar ring and popover note past 9 h, and past 10 h.
+    public static let long = Color(hex: 0xFFB547)
+    public static let veryLong = Color(hex: 0xFF5A4E)
     /// rgba(255,255,255,0.04): cards
     public static let cardFill = Color.white.opacity(0.04)
     /// rgba(255,255,255,0.05): empty rails
