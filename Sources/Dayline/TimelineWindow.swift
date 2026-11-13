@@ -129,6 +129,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         unsortedAt = 0
         viewModel.replay += 1
         if window?.contentView !== homeView { window?.contentView = homeView }
+        showSettingsButton(true)
         reload()
         bringToFront()
         timer?.invalidate()
@@ -139,6 +140,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     func show(settings view: NSView) {
         if window == nil { window = makeWindow() }
         if window?.contentView !== view { window?.contentView = view }
+        // A Settings button inside Settings goes nowhere.
+        showSettingsButton(false)
         timer?.invalidate()
         timer = nil
         bringToFront()
@@ -270,6 +273,17 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         if !w.setFrameUsingName("DaylineMain") { w.center() }
         w.delegate = self
         return w
+    }
+
+    /// Removing the item (not the toolbar) keeps the title bar's height.
+    private func showSettingsButton(_ visible: Bool) {
+        guard let toolbar = window?.toolbar else { return }
+        let index = toolbar.items.firstIndex { $0.itemIdentifier == Self.settingsItem }
+        if visible, index == nil {
+            toolbar.insertItem(withItemIdentifier: Self.settingsItem, at: toolbar.items.count)
+        } else if !visible, let index {
+            toolbar.removeItem(at: index)
+        }
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
