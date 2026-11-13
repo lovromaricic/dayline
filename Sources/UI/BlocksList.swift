@@ -129,10 +129,14 @@ private struct BlockRow: View {
             Text(Fmt.range(block.start, block.end, open: block.isOpen))
                 .font(.system(size: 13).monospacedDigit()).foregroundStyle(meta)
                 .frame(width: 96, alignment: .leading)
-            Circle().fill(Color(hexString: block.category.color)).frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(block.title ?? block.appName).font(.system(size: 14)).lineLimit(1).truncationMode(.tail)
-                Text(block.appName).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
+            // The dot sits by the title, 8 pt away like everywhere else, on its line.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Circle().fill(Color(hexString: block.category.color)).frame(width: 8, height: 8)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(block.title ?? block.appName).font(.system(size: 14)).lineLimit(1).truncationMode(.tail)
+                    Text(block.appName).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(block.edited ? "\(block.category.name) · edited" : block.category.name)
