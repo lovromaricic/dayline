@@ -126,6 +126,29 @@ private let xcode = Activity(appBundleID: "com.apple.dt.Xcode", appName: "Xcode"
         #expect(r.total(.away) == 0)
     }
 
+    @Test func callBelongsToTheTabItStartedIn() {
+        var r = Recorder()
+        r.send(.startTracking, at: 0)
+        let teams = chrome("Chat | Microsoft Teams", "https://teams.microsoft.com/v2/")
+        r.send(.activity(teams), at: 0)
+        r.send(.call(true), at: 10)
+        r.send(.activity(chrome("Sam - Slack", "https://app.slack.com/client/T1")), at: 60)
+        r.send(.activity(chrome("Week of 8 November - Google Calendar", "https://calendar.google.com/")), at: 90)
+        r.send(.activity(teams), at: 120)
+        r.send(.call(false), at: 300)
+        r.send(.tick, at: 400)
+        // Teams is the call; Slack and the calendar during it are not.
+        #expect(r.rows.map(\.call) == [false, true, false, false, true, false])
+    }
+
+    @Test func webAppHostsFromTitles() {
+        #expect(Titles.webAppHost("Alex, Sam - Acme - Slack") == "app.slack.com")
+        #expect(Titles.webAppHost("(2) Chat | Microsoft Teams") == "teams.microsoft.com")
+        #expect(Titles.webAppHost("Choose what to share with teams.microsoft.com") == "teams.microsoft.com")
+        #expect(Titles.webAppHost("teams.microsoft.com is sharing your screen.") == "teams.microsoft.com")
+        #expect(Titles.webAppHost("New Tab") == nil)
+    }
+
     @Test func callGraceBridgesMeetPreviewGap() {
         var r = Recorder()
         r.send(.startTracking, at: 0)

@@ -69,6 +69,10 @@ public struct Segmenter: Sendable {
     private var lastInput: Int64 = 0
     private var awaySince: Int64?
     private var rawCall = false
+    /// Where the call started: the app (and site) in front when the mic or
+    /// camera came on. Only time there is "in the call"; a Slack tab during a
+    /// Teams call is chat. nil when nothing was in front: every app counts.
+    private var callPlace: Activity?
     private var callOffSince: Int64?
     private var callEndedAt: Int64?
 
@@ -112,6 +116,8 @@ public struct Segmenter: Sendable {
             }
         case .call(let on):
             if on {
+                // A new call, not the same one coming back within the grace period.
+                if !inCall, case .visible(let a) = foreground { callPlace = a } else if !inCall { callPlace = nil }
                 rawCall = true
                 callOffSince = nil
                 awaySince = nil
@@ -139,6 +145,14 @@ public struct Segmenter: Sendable {
 
     // MARK: - Private
 
+    /// Same app, and for a browser the same host: meet.google.com is the
+    /// call, calendar.google.com is not.
+    private func isCallPlace(_ a: Activity) -> Bool {
+        guard let p = callPlace else { return true }
+        func site(_ x: Activity) -> String? { x.host ?? x.title.flatMap(Titles.webAppHost) }
+        return a.appBundleID == p.appBundleID && site(a) == site(p)
+    }
+
     private var isHidden: Bool {
         if case .hidden = foreground { return true }
         return false
@@ -162,7 +176,7 @@ public struct Segmenter: Sendable {
         if !suspended.isEmpty { return (.away, nil, false) }
         if isHidden { return nil }
         if awaySince != nil { return (.away, nil, false) }
-        if case .visible(let a) = foreground { return (.active, a, inCall) }
+        if case .visible(let a) = foreground { return (.active, a, inCall && isCallPlace(a)) }
         return nil
     }
 

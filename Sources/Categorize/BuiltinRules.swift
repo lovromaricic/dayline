@@ -19,6 +19,11 @@ public enum BuiltinRules {
             if let d = s.domain, let c = sites[d] { return c }
         }
         if let c = apps[s.appBundleID]?.1 { return c }
+        // A web app window (no address bar): known by its title.
+        if browsers.contains(s.appBundleID), s.host == nil, let host = s.title.flatMap(Titles.webAppHost) {
+            if let c = hosts[host] { return c }
+            if let c = sites[PublicSuffix.shared.registrableDomain(of: host)] { return c }
+        }
         if browsers.contains(s.appBundleID) { return .browsing }
         return nil
     }
@@ -122,10 +127,13 @@ public enum BuiltinRules {
         "com.apple.Phone": ("Phone", .communication),
         // Meetings
         "us.zoom.xos": ("Zoom", .meetings),
-        "com.microsoft.teams2": ("Microsoft Teams", .meetings),
+        // Mostly chat; time in a Teams call counts as Meetings (Categorizer).
+        "com.microsoft.teams2": ("Microsoft Teams", .communication),
         "com.apple.FaceTime": ("FaceTime", .meetings),
-        "com.apple.iCal": ("Calendar", .meetings),
-        "com.flexibits.fantastical2.mac": ("Fantastical", .meetings),
+        // Calendars are planning, not meetings; a call while one is open still
+        // counts as Meetings (Categorizer).
+        "com.apple.iCal": ("Calendar", .communication),
+        "com.flexibits.fantastical2.mac": ("Fantastical", .communication),
         "com.cisco.webexmeetingsapp": ("Webex", .meetings),
         "com.loom.desktop": ("Loom", .meetings),
         // Writing and Docs
@@ -170,10 +178,9 @@ public enum BuiltinRules {
         // Communication
         "slack.com": .communication, "discord.com": .communication, "whatsapp.com": .communication,
         "telegram.org": .communication, "outlook.com": .communication, "linkedin.com": .communication,
-        "superhuman.com": .communication,
+        "superhuman.com": .communication, "cal.com": .communication, "calendly.com": .communication,
         // Meetings
-        "zoom.us": .meetings, "whereby.com": .meetings, "cal.com": .meetings, "calendly.com": .meetings,
-        "webex.com": .meetings,
+        "zoom.us": .meetings, "whereby.com": .meetings, "webex.com": .meetings,
         // Writing and Docs
         "notion.so": .writing, "notion.site": .writing, "coda.io": .writing, "dropboxpaper.com": .writing,
         "medium.com": .writing, "substack.com": .writing, "quip.com": .writing, "craft.do": .writing,
@@ -191,8 +198,8 @@ public enum BuiltinRules {
 
     /// Full hosts, for sites that share a registrable domain.
     static let hosts: [String: ActivityCategory] = [
-        "meet.google.com": .meetings, "calendar.google.com": .meetings, "teams.microsoft.com": .meetings,
-        "teams.live.com": .meetings, "outlook.office.com": .communication,
+        "meet.google.com": .meetings, "calendar.google.com": .communication, "teams.microsoft.com": .communication,
+        "teams.live.com": .communication, "outlook.office.com": .communication,
         "mail.google.com": .communication, "chat.google.com": .communication,
         "docs.google.com": .writing, "drive.google.com": .writing, "sheets.google.com": .writing,
         "slides.google.com": .writing, "keep.google.com": .writing,

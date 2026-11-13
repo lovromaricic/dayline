@@ -8,8 +8,8 @@ import Domain
                 title: title, host: host, domain: PublicSuffix.shared.registrableDomain(of: host), call: call,
                 manualCategoryID: manual)
     }
-    func app(_ id: String, title: String? = nil) -> Segment {
-        Segment(id: 0, start: 0, end: 1, kind: .active, appBundleID: id, appName: id, title: title)
+    func app(_ id: String, title: String? = nil, call: Bool = false) -> Segment {
+        Segment(id: 0, start: 0, end: 1, kind: .active, appBundleID: id, appName: id, title: title, call: call)
     }
     func rule(_ kind: Rule.Kind, _ pattern: String, _ c: ActivityCategory, at: Int64 = 0, id: Int64 = 1) -> Rule {
         Rule(id: id, kind: kind, pattern: pattern, categoryID: c.id, origin: .user, createdAt: at)
@@ -22,7 +22,22 @@ import Domain
         #expect(c.category(for: chrome("news.bbc.co.uk")) == .browsing)
         #expect(c.category(for: app("com.apple.dt.Xcode")) == .development)
         #expect(c.category(for: app("com.example.unknown")) == .uncategorized)
-        #expect(c.category(for: chrome("github.com", call: true)) == .meetings)
+        // A call fills in Meetings only where the app has no category of its
+        // own, or is a chat app; Figma or GitHub during a call keep theirs.
+        #expect(c.category(for: chrome("github.com", call: true)) == .development)
+        #expect(c.category(for: app("com.figma.Desktop", call: true)) == .design)
+        #expect(c.category(for: app("com.example.unknown", call: true)) == .meetings)
+        #expect(c.category(for: app("com.tinyspeck.slackmacgap", call: true)) == .meetings)
+        // A calendar is planning; during a call it becomes the meeting.
+        #expect(c.category(for: chrome("calendar.google.com")) == .communication)
+        #expect(c.category(for: chrome("calendar.google.com", call: true)) == .meetings)
+        // Installed web apps have no address; their title says what they are.
+        let slackApp = Segment(id: 0, start: 0, end: 1, kind: .active, appBundleID: "com.google.Chrome", appName: "Google Chrome",
+                               title: "Alex, Sam - Acme - Slack")
+        #expect(c.category(for: slackApp) == .communication)
+        // Teams is chat until a call starts.
+        #expect(c.category(for: app("com.microsoft.teams2")) == .communication)
+        #expect(c.category(for: app("com.microsoft.teams2", call: true)) == .meetings)
     }
 
     @Test func appStoreCategoryFallback() {

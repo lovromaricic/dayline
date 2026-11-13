@@ -3,9 +3,12 @@ import Domain
 /// Resolution order (spec section 4), first match wins:
 /// 1. a manual correction on the segment ("Just this time")
 /// 2. your rules, newest first within a kind; kinds in order site, app, title
-/// 3. a call (mic/camera in use) counts as Meetings when that setting is on
-/// 4. built-in rules (BuiltinRules.swift)
-/// 5. the app's own LSApplicationCategoryType
+/// 3. built-in rules (BuiltinRules.swift)
+/// 4. the app's own LSApplicationCategoryType
+/// 5. a call counts as Meetings when that setting is on. The segment's call
+///    flag is set only in the app or tab where the call started (Segmenter),
+///    and only chat, browsing or uncategorized time turns into Meetings:
+///    Figma stays Design even in older data where the flag covered everything
 /// 6. Uncategorized
 public struct Categorizer: Sendable {
     /// Spec setting "Count calls as active".
@@ -55,15 +58,10 @@ public struct Categorizer: Sendable {
 
     /// Steps 3–6: what Dayline picks without any input from you.
     public func guess(_ s: Segment) -> ActivityCategory {
-        let seed: ActivityCategory
-        if callsAreMeetings && s.call {
+        var seed = BuiltinRules.category(for: s)
+            ?? appCategoryType(s.appBundleID).flatMap(BuiltinRules.appStoreCategory) ?? .uncategorized
+        if callsAreMeetings && s.call && [ActivityCategory.uncategorized, .communication, .browsing].contains(seed) {
             seed = .meetings
-        } else if let c = BuiltinRules.category(for: s) {
-            seed = c
-        } else if let type = appCategoryType(s.appBundleID), let c = BuiltinRules.appStoreCategory(type) {
-            seed = c
-        } else {
-            seed = .uncategorized
         }
         // Built-ins point at seed rows; show them under their current name and
         // color, or wherever that row was merged to.
