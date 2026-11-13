@@ -194,6 +194,7 @@ private struct CategoriesPage: View {
                 categoriesSection
                 if !vm.unsorted.isEmpty { unsortedSection }
                 rulesSection
+                neverTrackSection
             }
             .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32).darkScroller()
             // A click on empty space ends naming; leaving the field saves it.
@@ -341,7 +342,8 @@ private struct CategoriesPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(Durations.format(u.total)).font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)
                 .lineLimit(1).fixedSize()
-            CategoryPicker(categories: vm.userCategories, selected: nil, onNew: { newCategory = "" }) {
+            CategoryPicker(categories: vm.userCategories, selected: nil, onNew: { newCategory = "" },
+                           onNeverTrack: { vm.onAddExclusion?(u.kind, u.pattern) }) {
                 vm.onSort?(u, $0.id)
             }
             .frame(width: 200)
@@ -351,6 +353,23 @@ private struct CategoriesPage: View {
         .padding(.leading, 20).padding(.trailing, 12).padding(.vertical, 10)
         .frame(minHeight: 56)
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: Never track
+
+    private var neverTrackSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(vm.exclusions.isEmpty ? "NEVER TRACK" : "NEVER TRACK · \(vm.exclusions.count)").eyebrow()
+                Spacer()
+                Text("Time in these is not recorded.").font(.system(size: 12)).foregroundStyle(Theme.textFaint)
+            }
+            .frame(height: 32)
+            NeverTrackList(vm: vm)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.02)))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+        }
     }
 
     // MARK: Rules
@@ -467,6 +486,8 @@ struct CategoryPicker: View {
     var selected: ActivityCategory?
     /// Adds "New category…" at the bottom, which opens the + New category field.
     var onNew: (() -> Void)?
+    /// Adds "Never track" under it: stop recording the app or site.
+    var onNeverTrack: (() -> Void)?
     var onPick: (ActivityCategory) -> Void
 
     var body: some View {
@@ -475,6 +496,9 @@ struct CategoryPicker: View {
             if let onNew {
                 Divider()
                 Button("New category…", action: onNew)
+            }
+            if let onNeverTrack {
+                Button("Never track", action: onNeverTrack)
             }
         } label: {
             HStack(spacing: 8) {

@@ -62,12 +62,10 @@ final class SettingsController {
         // Privacy & data
         viewModel.onSetSkipPrivate = { [weak self] on in engine.skipPrivateWindows = on; self?.reload() }
         viewModel.onAddExclusion = { [weak self] kind, pattern in
-            self?.write { try db.addExclusion(kind: kind, pattern: pattern) }
-            engine.reloadExclusions()
+            self?.write { try db.addExclusion(kind: kind, pattern: pattern); engine.reloadExclusions() }
         }
         viewModel.onDeleteExclusion = { [weak self] id in
-            self?.write { try db.deleteExclusion(id: id) }
-            engine.reloadExclusions()
+            self?.write { try db.deleteExclusion(id: id); engine.reloadExclusions() }
         }
         viewModel.onSetRetention = { [weak self] days in
             if let days, let self, !confirm("Keep only the last \(days == 365 ? "year" : "\(days) days")?",

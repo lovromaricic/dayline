@@ -220,15 +220,21 @@ MainActor.assumeIsolated {
         Unsorted(kind: .app, pattern: "com.linear", name: "Linear", via: nil, blocks: 6, total: 3900),
         Unsorted(kind: .app, pattern: "com.raycast.macos", name: "Raycast", via: nil, blocks: 9, total: 720),
     ]
-    let host = NSHostingView(rootView: SettingsView(viewModel: s).frame(width: 1200, height: 716))
-    let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: 716), styleMask: [.borderless], backing: .buffered, defer: false)
-    win.contentView = host
-    host.layoutSubtreeIfNeeded()
-    RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-    let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
-    host.cacheDisplay(in: host.bounds, to: rep)
-    try! rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "settings-categories-unsorted.png"))
-    print("wrote settings-categories-unsorted.png")
+    s.exclusions = [.init(id: 1, kind: .app, label: "Finder"), .init(id: 2, kind: .app, label: "1Password")]
+    s.storageText = "4.2 MB since 9 Nov"
+    for (name, section, height) in [("settings-categories-unsorted", SettingsSection.categories, 1000.0),
+                                    ("settings-privacy", .privacy, 716)] {
+        s.section = section
+        let host = NSHostingView(rootView: SettingsView(viewModel: s).frame(width: 1200, height: height))
+        let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: height), styleMask: [.borderless], backing: .buffered, defer: false)
+        win.contentView = host
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        host.cacheDisplay(in: host.bounds, to: rep)
+        try! rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "\(name).png"))
+        print("wrote \(name).png")
+    }
 }
 
 if realDay {

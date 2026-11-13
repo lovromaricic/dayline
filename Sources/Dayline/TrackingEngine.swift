@@ -157,7 +157,11 @@ final class TrackingEngine {
             let segs = (try? store.segments(from: from, to: to)) ?? []
             return DayReport(segments: segs, dayStart: from, now: now, resolve: { resolver.resolve($0) })
         }
-        return Unsorted.collect(reports)
+        // Never track: nothing to sort, even for time recorded before it was added.
+        let ex = exclusions
+        return Unsorted.collect(reports).filter { u in
+            u.kind == .app ? !ex.apps.contains(u.pattern) : !ex.sites.contains { u.pattern == $0 || u.pattern.hasSuffix("." + $0) }
+        }
     }
 
     /// What the "Now" card shows when there is no current block.

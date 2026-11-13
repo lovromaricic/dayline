@@ -145,48 +145,16 @@ struct GeneralPage: View {
 
 struct PrivacyPage: View {
     @ObservedObject var vm: SettingsViewModel
-    @State private var adding = false
-    @State private var kind = Rule.Kind.app
-    @State private var site = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 pageHeader("Privacy & data", "Everything stays on this Mac. Decide what Dayline ignores and what it keeps.")
-                group("NEVER TRACK") {
+                group("PRIVATE BROWSING") {
                     SettingRow(title: "Private browsing windows",
                                subtitle: vm.skipPrivate ? "Chrome Incognito windows are skipped." : "Chrome Incognito windows are recorded like any other window.",
                                first: true) {
                         toggle("Skip private browsing windows", vm.skipPrivate, vm.onSetSkipPrivate)
-                    }
-                    ForEach(vm.exclusions) { e in
-                        HStack(spacing: 14) {
-                            kindChip(e.kind).frame(width: 52, alignment: .leading)
-                            Text(e.label).font(.system(size: 14)).frame(maxWidth: .infinity, alignment: .leading)
-                            Button(action: { vm.onDeleteExclusion?(e.id) }) {
-                                Image(systemName: "xmark").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.textMuted)
-                                    .frame(width: 32, height: 32).contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Stop excluding \(e.label)")
-                        }
-                        .padding(.leading, 20).padding(.trailing, 12).padding(.vertical, 8)
-                        .frame(minHeight: 46)
-                        .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
-                    }
-                    if adding { addRow } else {
-                        Button(action: { adding = true }) {
-                            HStack(spacing: 8) {
-                                Text("+").font(.system(size: 16))
-                                Text("Add an app or site").font(.system(size: 13))
-                            }
-                            .foregroundStyle(Theme.textMuted)
-                            .padding(.horizontal, 20).padding(.vertical, 10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
                     }
                 }
                 group("YOUR DATA") {
@@ -216,6 +184,52 @@ struct PrivacyPage: View {
         case nil: "Forever"
         case 365: "1 year"
         case let d?: "\(d) days"
+        }
+    }
+}
+
+/// Never track (spec 5.4, on Categories & rules): apps and sites whose time is
+/// not recorded at all. Private browsing windows stay on Privacy & data.
+struct NeverTrackList: View {
+    @ObservedObject var vm: SettingsViewModel
+    /// Matches the rule rows above it.
+    var chipWidth: CGFloat = 150
+    @State private var adding = false
+    @State private var kind = Rule.Kind.app
+    @State private var site = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(vm.exclusions.enumerated()), id: \.element.id) { i, e in
+                HStack(spacing: 14) {
+                    kindChip(e.kind).frame(width: chipWidth, alignment: .leading)
+                    Text(e.label).font(.system(size: 14)).frame(maxWidth: .infinity, alignment: .leading)
+                    Button(action: { vm.onDeleteExclusion?(e.id) }) {
+                        Image(systemName: "xmark").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.textMuted)
+                            .frame(width: 32, height: 32).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Track it again")
+                    .accessibilityLabel("Stop excluding \(e.label)")
+                }
+                .padding(.leading, 20).padding(.trailing, 12).padding(.vertical, 8)
+                .frame(minHeight: 46)
+                .overlay(alignment: .top) { Rectangle().fill(i == 0 ? .clear : Theme.border).frame(height: 1) }
+            }
+            if adding { addRow } else {
+                Button(action: { adding = true }) {
+                    HStack(spacing: 8) {
+                        Text("+").font(.system(size: 16))
+                        Text("Add an app or site").font(.system(size: 13))
+                    }
+                    .foregroundStyle(Theme.textMuted)
+                    .padding(.horizontal, 20).padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .overlay(alignment: .top) { Rectangle().fill(vm.exclusions.isEmpty ? .clear : Theme.border).frame(height: 1) }
+            }
         }
     }
 
