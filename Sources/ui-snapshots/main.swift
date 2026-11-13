@@ -157,7 +157,23 @@ let morning = DayReport(segments: Array(homeDay.prefix(5)) + [hseg(at(12, 0), at
 let empty = DayReport(segments: [], dayStart: dayStart, now: at(9, 0), category: homeCategory)
 let filteredVM = HomeViewModel(report: homeReport)
 filteredVM.categoryFilter = homeReport.lanes.first?.category
+// Week view: the sample day repeated through the week, longer midweek.
+let weekStart = Int64(cal.dateInterval(of: .weekOfYear, for: Date())!.start.timeIntervalSince1970)
+let weekStarts = (0..<7).map { Int64(cal.startOfDay(for: cal.date(byAdding: .day, value: $0, to: Date(timeIntervalSince1970: TimeInterval(weekStart)))!).timeIntervalSince1970) }
+let weekReports = weekStarts.enumerated().filter { $0.element <= dayStart }.map { i, start in
+    let shift = start - dayStart
+    var segs = homeDay.map { s -> Segment in
+        var c = s; c.id += Int64(i) * 100; c.start += shift; c.end += shift; return c
+    }
+    // Wednesday and Thursday run into the evening.
+    if i == 2 || i == 3 { segs.append(hseg(at(16, 10) + shift, at(16, 10) + shift + Int64(i) * 3600, "Zoom", "Planning")) }
+    return DayReport(segments: segs, dayStart: start, now: start == dayStart ? now : start + 86_399, category: homeCategory)
+}
+let weekVM = HomeViewModel(report: homeReport)
+weekVM.setPeriod(.week)
+weekVM.week = WeekReport(weekStart: weekStarts[0], reports: weekReports, dayStarts: weekStarts, today: dayStart)
 let homes: [(String, HomeViewModel)] = [
+    ("home-09-week", weekVM),
     ("home-08-filtered", filteredVM),
     ("home-01-selected", selectedVM),
     ("home-02-nothing-selected", HomeViewModel(report: homeReport)),

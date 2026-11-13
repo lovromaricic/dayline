@@ -30,6 +30,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         super.init()
         viewModel.onMoveDay = { [weak self] days in self?.move(days: days) }
         viewModel.onPickDay = { [weak self] date in self?.show(day: Self.startOfDay(date)) }
+        viewModel.onSetPeriod = { [weak self] _ in self?.reload() }
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
         viewModel.onAlways = { [weak self] correction in self?.always(correction) }
         viewModel.onOpenSystemSettings = { engine.openSystemSettings() }
@@ -155,7 +156,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         // Past days do not change; only today needs the 5 s refresh. After
         // midnight a window that was showing today moves on to the new day.
         if followsToday && dayStart != today { dayStart = today }
-        if dayStart == today { reload() }
+        if dayStart == today || viewModel.period == .week && viewModel.week?.containsToday == true { reload() }
     }
 
     private func show(day: Int64) {
@@ -167,7 +168,9 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
 
     private func move(days: Int) {
         let cal = Calendar.current
-        let d = cal.date(byAdding: .day, value: days, to: Date(timeIntervalSince1970: TimeInterval(dayStart)))!
+        // The arrows step a whole week in the week view.
+        let step = viewModel.period == .week ? days * 7 : days
+        let d = cal.date(byAdding: .day, value: step, to: Date(timeIntervalSince1970: TimeInterval(dayStart)))!
         show(day: Self.startOfDay(d))
     }
 
@@ -179,6 +182,24 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         if viewModel.categories != categorizer.categoryList { viewModel.categories = categorizer.categoryList }
         viewModel.update(DayReport(segments: segments, dayStart: dayStart, now: TrackingEngine.now(),
                                    resolve: { categorizer.resolve($0) }))
+        let week = viewModel.period == .week ? loadWeek() : nil
+        if viewModel.week != week { viewModel.week = week }
+    }
+
+    /// The calendar week around `dayStart`, one DayReport per day up to today.
+    private func loadWeek() -> WeekReport {
+        let cal = Calendar.current
+        let anchor = Date(timeIntervalSince1970: TimeInterval(dayStart))
+        let start = cal.dateInterval(of: .weekOfYear, for: anchor)?.start ?? anchor
+        let starts = (0..<7).map { Self.startOfDay(cal.date(byAdding: .day, value: $0, to: start)!) }
+        let today = Self.startOfDay(Date()), now = TrackingEngine.now()
+        let categorizer = engine.categorizer
+        let reports = starts.filter { $0 <= today }.map { day in
+            let next = Self.startOfDay(cal.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: TimeInterval(day)))!)
+            let segs = (try? engine.store.segments(from: day, to: next)) ?? []
+            return DayReport(segments: segs, dayStart: day, now: now, resolve: { categorizer.resolve($0) })
+        }
+        return WeekReport(weekStart: starts[0], reports: reports, dayStarts: starts, today: today)
     }
 
     private func makeWindow() -> NSWindow {

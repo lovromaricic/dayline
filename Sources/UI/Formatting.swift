@@ -29,6 +29,15 @@ enum Fmt {
         return "\(weekday) · \(dayMonth)".uppercased()
     }
 
+    /// "9 – 15 NOVEMBER", or "27 OCTOBER – 2 NOVEMBER" across months.
+    static func weekEyebrow(_ weekStart: Int64) -> String {
+        let start = date(weekStart)
+        let end = Calendar.current.date(byAdding: .day, value: 6, to: start)!
+        let sameMonth = Calendar.current.isDate(start, equalTo: end, toGranularity: .month)
+        let first = sameMonth ? start.formatted(.dateTime.day()) : start.formatted(.dateTime.day().month(.wide))
+        return "\(first) – \(end.formatted(.dateTime.day().month(.wide)))".uppercased()
+    }
+
     /// "20 minutes", "1 hour 5 minutes" (inspector subtitle).
     static func longDuration(_ seconds: Int64) -> String {
         let m = max(0, seconds) / 60

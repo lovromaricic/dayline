@@ -1,6 +1,12 @@
 import Domain
 import Foundation
 
+/// Day or week, switched next to the date (spec 5.3).
+public enum Period: String, CaseIterable, Sendable {
+    case day = "Day"
+    case week = "Week"
+}
+
 public enum TimelineMode: String, CaseIterable, Sendable {
     case byCategory = "By category"
     case timeline = "Timeline"
@@ -42,6 +48,9 @@ public struct Correction: Equatable, Sendable {
 /// State of the main window. The app sets `report`; the view owns the rest.
 public final class HomeViewModel: ObservableObject {
     @Published public var report: DayReport
+    @Published public private(set) var period = Period.day
+    /// Set by the app while the week view is shown.
+    @Published public var week: WeekReport?
     @Published public var selection: Int64?
     @Published public var mode = TimelineMode.byCategory
     @Published public var search = ""
@@ -71,6 +80,8 @@ public final class HomeViewModel: ObservableObject {
     /// Move by whole days; the app reloads `report`.
     public var onMoveDay: ((Int) -> Void)?
     public var onPickDay: ((Date) -> Void)?
+    /// The app loads the week (or the day) after a switch.
+    public var onSetPeriod: ((Period) -> Void)?
     /// Re-categorize just this block (the app writes the override and reloads).
     public var onSetCategory: ((Block, ActivityCategory) -> Void)?
     /// "Always": turn the correction into a rule.
@@ -97,6 +108,20 @@ public final class HomeViewModel: ObservableObject {
         guard let c = pendingCorrection else { return }
         pendingCorrection = nil
         if let b = report.blocks.first(where: { $0.id == c.blockID }) { onSetCategory?(b, c.previous) }
+    }
+
+    public func setPeriod(_ p: Period) {
+        guard p != period else { return }
+        period = p
+        select(nil)
+        onSetPeriod?(p)
+    }
+
+    /// A day row in the week view: open that day.
+    public func openDay(_ dayStart: Int64) {
+        period = .day
+        onSetPeriod?(.day)
+        onPickDay?(Date(timeIntervalSince1970: TimeInterval(dayStart)))
     }
 
     public init(report: DayReport) {

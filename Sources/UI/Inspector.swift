@@ -134,12 +134,21 @@ struct Inspector: View {
 
     // MARK: - Nothing selected
 
+    /// In the week view the panel sums the week instead of the day.
+    private var week: WeekReport? { vm.period == .week ? vm.week : nil }
+    private var topApps: [DayReport.AppTotal] { week?.topApps ?? vm.report.topApps }
+    private var longestFocus: DayReport.Focus? { week.map { $0.longestFocus } ?? vm.report.longestFocus }
+    private var topAppsTitle: String {
+        if let week { return week.containsToday ? "TOP APPS THIS WEEK" : "TOP APPS" }
+        return vm.report.isToday ? "TOP APPS TODAY" : "TOP APPS"
+    }
+
     private var empty: some View {
         VStack(alignment: .leading, spacing: 28) {
-            if !vm.report.topApps.isEmpty {
+            if !topApps.isEmpty {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text(vm.report.isToday ? "TOP APPS TODAY" : "TOP APPS").eyebrow()
-                    let apps = Array(vm.report.topApps.prefix(4))
+                    Text(topAppsTitle).eyebrow()
+                    let apps = Array(topApps.prefix(4))
                     let maxTotal = Double(apps.first?.total ?? 1)
                     ForEach(apps, id: \.appName) { app in
                         VStack(spacing: 6) {
@@ -165,10 +174,12 @@ struct Inspector: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("LONGEST FOCUS").eyebrow()
-                if let f = vm.report.longestFocus {
+                if let f = longestFocus {
                     // Same headline style as the selected block's time range.
                     Text(Durations.format(f.duration)).font(.system(size: 26, weight: .light).monospacedDigit()).padding(.top, 6)
-                    Text("in \(f.appName) · \(Fmt.range(f.start, f.end))").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                    // A week needs the day too: "in Xcode · Thu 10:19 – 14:39".
+                    let day = week == nil ? "" : Fmt.date(f.start).formatted(.dateTime.weekday(.abbreviated)) + " "
+                    Text("in \(f.appName) · \(day)\(Fmt.range(f.start, f.end))").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
                     if let t = f.title {
                         Text(t).font(.system(size: 13)).foregroundStyle(Theme.textMuted).lineLimit(1).truncationMode(.tail)
                     }
@@ -185,7 +196,7 @@ struct Inspector: View {
             .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
             // A first-run hint, so it sits at the bottom rather than above the data.
-            Text("Click a block to inspect it or fix its category.")
+            Text(week == nil ? "Click a block to inspect it or fix its category." : "Click a day to open it.")
                 .font(.system(size: 12)).foregroundStyle(Theme.textFaint).lineSpacing(2)
         }
     }

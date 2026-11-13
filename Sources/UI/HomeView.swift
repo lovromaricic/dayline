@@ -33,8 +33,8 @@ public struct HomeView: View {
         .ignoresSafeArea(edges: .top)
         .focusable()
         .focusEffectDisabled()
-        .onKeyPress(.upArrow) { vm.moveSelection(-1); return .handled }
-        .onKeyPress(.downArrow) { vm.moveSelection(1); return .handled }
+        .onKeyPress(.upArrow) { if vm.period == .day { vm.moveSelection(-1) }; return .handled }
+        .onKeyPress(.downArrow) { if vm.period == .day { vm.moveSelection(1) }; return .handled }
         .onKeyPress(.leftArrow) { searchFocused ? .ignored : move(-1) }
         .onKeyPress(.rightArrow) { searchFocused ? .ignored : move(1) }
         .onKeyPress(.escape) {
@@ -67,13 +67,18 @@ public struct HomeView: View {
         VStack(alignment: .leading, spacing: 20) {
             // App state (paused, access lost or granted) sits above the day's summary.
             StatusBanner(vm: vm)
-            header
-            timeline
-            // A little extra room so the list reads as its own section, not chart labels.
-            BlocksList(vm: vm, searchFocus: $searchFocused)
-                .padding(.top, 12)
-            if r.isToday && r.tracked > 0 && r.tracked < 30 * 60 && vm.phase == .tracking {
-                firstDayHint
+            if vm.period == .week, let week = vm.week {
+                weekHeader(week)
+                WeekChart(vm: vm, week: week)
+            } else {
+                header
+                timeline
+                // A little extra room so the list reads as its own section, not chart labels.
+                BlocksList(vm: vm, searchFocus: $searchFocused)
+                    .padding(.top, 12)
+                if r.isToday && r.tracked > 0 && r.tracked < 30 * 60 && vm.phase == .tracking {
+                    firstDayHint
+                }
             }
         }
         .padding(.top, 16).padding(.horizontal, 32).padding(.bottom, 24)
@@ -93,7 +98,7 @@ public struct HomeView: View {
     }
 
     private func move(_ days: Int) -> KeyPress.Result {
-        if days > 0 && r.isToday { return .handled }
+        if days > 0 && atLatest { return .handled }
         vm.onMoveDay?(days)
         return .handled
     }
@@ -114,7 +119,19 @@ public struct HomeView: View {
 
     private var header: some View {
         let (first, second) = r.headline(trackingNow: vm.phase == .tracking)
-        return HStack(alignment: .bottom, spacing: 24) {
+        return summary(first, second, total: r.tracked, subtitle: totalSubtitle)
+    }
+
+    private func weekHeader(_ w: WeekReport) -> some View {
+        let (first, second) = w.headline()
+        let days = "\(w.trackedDays) day\(w.trackedDays == 1 ? "" : "s")"
+        let subtitle = w.trackedDays > 1 ? "\(days) · avg \(Durations.format(w.average))" : w.trackedDays == 1 ? days : "Tracked"
+        return summary(first, second, total: w.tracked, subtitle: subtitle)
+    }
+
+    /// The date line, the two-line headline and the big total; shared by day and week.
+    private func summary(_ first: String, _ second: String, total: Int64, subtitle: String) -> some View {
+        HStack(alignment: .bottom, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
                 dayNavigation
                 (Text(first) + Text("\n") + Text(second).foregroundColor(Theme.textMuted))
@@ -125,11 +142,11 @@ public struct HomeView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
-                Text(Durations.format(r.tracked))
+                Text(Durations.format(total))
                     .font(.system(size: 64, weight: .light).monospacedDigit())
                     .tracking(-1.92)
                     .lineLimit(1)
-                Text(totalSubtitle).font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                Text(subtitle).font(.system(size: 13)).foregroundStyle(Theme.textMuted)
             }
             .accessibilityElement(children: .combine)
         }
@@ -142,14 +159,20 @@ public struct HomeView: View {
         return tracked
     }
 
-    /// Spec 5.3: a quiet chevron pair next to the date; click the date for a picker.
+    /// Today, or the week that holds today: nothing later to move to.
+    private var atLatest: Bool { vm.period == .week ? vm.week?.containsToday ?? true : r.isToday }
+
+    /// Spec 5.3: the Day/Week switch, the date, and a quiet chevron pair;
+    /// click the date for a picker.
     private var dayNavigation: some View {
-        HStack(spacing: 6) {
+        let week = vm.period == .week
+        return HStack(spacing: 6) {
+            PeriodSwitch(vm: vm).padding(.trailing, 8)
             Button(action: { pickingDay = true }) {
-                Text(Fmt.dayEyebrow(r.dayStart)).eyebrow()
+                Text(week ? Fmt.weekEyebrow(vm.week?.weekStart ?? r.dayStart) : Fmt.dayEyebrow(r.dayStart)).eyebrow()
             }
             .buttonStyle(.plain)
-            .help("Pick a day")
+            .help(week ? "Pick a week" : "Pick a day")
             .popover(isPresented: $pickingDay, arrowEdge: .bottom) {
                 DatePicker("", selection: Binding(
                     get: { Fmt.date(r.dayStart) },
@@ -159,8 +182,8 @@ public struct HomeView: View {
                     .labelsHidden()
                     .padding(12)
             }
-            chevron("chevron.left", label: "Previous day", enabled: true) { vm.onMoveDay?(-1) }
-            chevron("chevron.right", label: "Next day", enabled: !r.isToday) { vm.onMoveDay?(1) }
+            chevron("chevron.left", label: week ? "Previous week" : "Previous day", enabled: true) { vm.onMoveDay?(-1) }
+            chevron("chevron.right", label: week ? "Next week" : "Next day", enabled: !atLatest) { vm.onMoveDay?(1) }
         }
     }
 
@@ -200,5 +223,31 @@ public struct HomeView: View {
             }
             TimelineChart(vm: vm)
         }
+    }
+}
+
+/// Day | Week, at the start of the date line.
+private struct PeriodSwitch: View {
+    @ObservedObject var vm: HomeViewModel
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Period.allCases, id: \.self) { p in
+                let on = vm.period == p
+                Button(action: { vm.setPeriod(p) }) {
+                    Text(p.rawValue).font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(on ? Theme.text : Theme.textMuted)
+                        .padding(.horizontal, 10).frame(height: 24)
+                        .background(on ? Theme.surfaceControl : .clear)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Show a day or a week")
     }
 }
