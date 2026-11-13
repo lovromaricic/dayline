@@ -6,6 +6,7 @@ public struct HomeView: View {
     @ObservedObject var vm: HomeViewModel
     @FocusState private var searchFocused: Bool
     @State private var pickingDay = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// ImageRenderer cannot draw ScrollView content; snapshots turn it off.
     private let scrolls: Bool
 
@@ -67,11 +68,10 @@ public struct HomeView: View {
         VStack(alignment: .leading, spacing: 20) {
             // App state (paused, access lost or granted) sits above the day's summary.
             StatusBanner(vm: vm)
+            summaryHeader
             if vm.period == .week, let week = vm.week {
-                weekHeader(week)
                 WeekChart(vm: vm, week: week)
             } else {
-                header
                 timeline
                 if vm.unsortedCount > 0 { unsortedNote }
                 // A little extra room so the list reads as its own section, not chart labels.
@@ -142,16 +142,17 @@ public struct HomeView: View {
 
     // MARK: - Header
 
-    private var header: some View {
+    /// One header for day and week: the same views with new values, so the
+    /// big total rolls from the day's to the week's instead of swapping.
+    private var summaryHeader: some View {
+        if vm.period == .week, let w = vm.week {
+            let (first, second) = w.headline()
+            let days = "\(w.trackedDays) day\(w.trackedDays == 1 ? "" : "s")"
+            let subtitle = w.trackedDays > 1 ? "\(days) · avg \(Durations.format(w.average))" : w.trackedDays == 1 ? days : "Tracked"
+            return summary(first, second, total: w.tracked, subtitle: subtitle)
+        }
         let (first, second) = r.headline(trackingNow: vm.phase == .tracking)
         return summary(first, second, total: r.tracked, subtitle: totalSubtitle)
-    }
-
-    private func weekHeader(_ w: WeekReport) -> some View {
-        let (first, second) = w.headline()
-        let days = "\(w.trackedDays) day\(w.trackedDays == 1 ? "" : "s")"
-        let subtitle = w.trackedDays > 1 ? "\(days) · avg \(Durations.format(w.average))" : w.trackedDays == 1 ? days : "Tracked"
-        return summary(first, second, total: w.tracked, subtitle: subtitle)
     }
 
     /// The date line, the two-line headline and the big total; shared by day and week.
@@ -168,6 +169,8 @@ public struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 0) {
                 Text(Durations.format(total))
+                    .contentTransition(.numericText(value: Double(total)))
+                    .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: total)
                     .font(.system(size: 64, weight: .light).monospacedDigit())
                     .tracking(-1.92)
                     .lineLimit(1)
@@ -232,7 +235,10 @@ public struct HomeView: View {
             HStack(spacing: 20) {
                 ForEach(TimelineMode.allCases, id: \.self) { mode in
                     let on = vm.mode == mode
-                    Button(mode.rawValue.uppercased()) { vm.mode = mode }
+                    // Bars glide between their lanes and the single strip.
+                    Button(mode.rawValue.uppercased()) {
+                        withAnimation(reduceMotion ? nil : .smooth(duration: 0.4)) { vm.mode = mode }
+                    }
                         .buttonStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
                         .tracking(0.96)

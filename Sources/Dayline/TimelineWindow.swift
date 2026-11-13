@@ -33,7 +33,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onMoveDay = { [weak self] days in self?.move(days: days) }
         viewModel.onSortUnsorted = { [weak self] in self?.onSortUnsorted?() }
         viewModel.onPickDay = { [weak self] date in self?.show(day: Self.startOfDay(date)) }
-        viewModel.onSetPeriod = { [weak self] _ in self?.reload() }
+        viewModel.onSetPeriod = { [weak self] _ in self?.reload(); self?.viewModel.replay += 1 }
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
         viewModel.onAlways = { [weak self] correction in self?.always(correction) }
         viewModel.onOpenSystemSettings = { engine.openSystemSettings() }
@@ -127,6 +127,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         if !(window?.isVisible ?? false) { followsToday = true }
         if followsToday { dayStart = Self.startOfDay(Date()) }
         unsortedAt = 0
+        viewModel.replay += 1
         if window?.contentView !== homeView { window?.contentView = homeView }
         reload()
         bringToFront()
@@ -171,9 +172,12 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
 
     private func show(day: Int64) {
         let today = Self.startOfDay(Date())
+        let before = viewModel.period == .week ? weekStart(dayStart) : dayStart
         dayStart = min(day, today)
         followsToday = dayStart == today
         reload()
+        // A new day, or a new week in the week view: the charts grow in again.
+        if (viewModel.period == .week ? weekStart(dayStart) : dayStart) != before { viewModel.replay += 1 }
     }
 
     private func move(days: Int) {
@@ -206,6 +210,11 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     }
 
     private var unsortedAt: Int64 = 0
+
+    private func weekStart(_ day: Int64) -> Int64 {
+        let anchor = Date(timeIntervalSince1970: TimeInterval(day))
+        return Int64((Calendar.current.dateInterval(of: .weekOfYear, for: anchor)?.start ?? anchor).timeIntervalSince1970)
+    }
 
     /// The calendar week around `dayStart`, one DayReport per day up to today.
     private func loadWeek() -> WeekReport {

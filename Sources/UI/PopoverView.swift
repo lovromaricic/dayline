@@ -3,6 +3,8 @@ import SwiftUI
 
 public final class PopoverViewModel: ObservableObject {
     @Published public var model: PopoverModel
+    /// Bumped each time the popover opens, to replay the opening animation.
+    @Published public var opened = 0
 
     public init(model: PopoverModel) {
         self.model = model
@@ -13,6 +15,11 @@ public final class PopoverViewModel: ObservableObject {
 public struct PopoverView: View {
     @ObservedObject var viewModel: PopoverViewModel
     let actions: PopoverActions
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Opening: the content grows from 96% at the top edge (the panel fades in
+    /// with it), then the category bar fills in from the left.
+    @State private var shown = true
+    @State private var barFill: CGFloat = 1
 
     public init(viewModel: PopoverViewModel, actions: PopoverActions) {
         self.viewModel = viewModel
@@ -24,17 +31,20 @@ public struct PopoverView: View {
     private var isPaused: Bool { if case .paused = m.phase { true } else { false } }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            // The total sits close under the status line; 18 pt elsewhere.
+        VStack(alignment: .leading, spacing: 16) {
+            // The total sits close under the status line; 16 pt between groups.
             VStack(alignment: .leading, spacing: 2) {
                 header
                 total
             }
             card
             if hasData && m.phase != .needsPermission && m.phase != .waitingForPermission {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     CategorySplitBar(rails: m.summary.rails)
                         .opacity(isPaused ? 0.4 : 1)
+                        .mask(alignment: .leading) {
+                            GeometryReader { geo in Rectangle().frame(width: geo.size.width * barFill) }
+                        }
                     topCategories
                 }
             }
@@ -47,6 +57,17 @@ public struct PopoverView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.border))
         .foregroundStyle(Theme.text)
         .environment(\.colorScheme, .dark)
+        .scaleEffect(shown ? 1 : 0.96, anchor: .top)
+        .onChange(of: viewModel.opened) { playOpening() }
+    }
+
+    private func playOpening() {
+        guard !reduceMotion else { return }
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) { shown = false; barFill = 0 }
+        withAnimation(.smooth(duration: 0.18)) { shown = true }
+        withAnimation(.smooth(duration: 0.4).delay(0.08)) { barFill = 1 }
     }
 
     // MARK: - Header
@@ -205,7 +226,9 @@ public struct PopoverView: View {
             return ("PAUSED SINCE \(clock(since))", "Nothing is being recorded", detail, nil)
         case .tracking:
             if let cur = m.summary.current {
-                return ("NOW", cur.title, "\(cur.appName) · \(cur.category.name) · \(minutesText(m.now - cur.since))",
+                // The app name once: a title that is just the app is not repeated below it.
+                let app = cur.title == cur.appName ? "" : "\(cur.appName) · "
+                return ("NOW", cur.title, "\(app)\(cur.category.name) · \(minutesText(m.now - cur.since))",
                         Color(hexString: cur.category.color))
             }
             switch m.nowStatus {
@@ -219,10 +242,9 @@ public struct PopoverView: View {
         }
     }
 
-    /// "8 min", "1h 05m".
+    /// "for 12m", "for 1h 05m"; "just started" in the first minute.
     private func minutesText(_ seconds: Int64) -> String {
-        if seconds < 60 { return "just now" }
-        return seconds >= 3600 ? Durations.format(seconds) : "\(seconds / 60) min"
+        seconds < 60 ? "just started" : "for \(Durations.format(seconds))"
     }
 
     // MARK: - Top categories
@@ -233,7 +255,8 @@ public struct PopoverView: View {
                 HStack {
                     HStack(spacing: 8) {
                         Circle().fill(Color(hexString: rail.category.color)).frame(width: 8, height: 8)
-                        Text(rail.category.name)
+                        // A step below the Now card, so the total and now lead.
+                        Text(rail.category.name).foregroundStyle(Theme.textSecondary)
                     }
                     Spacer()
                     Text(Durations.format(rail.total)).monospacedDigit().foregroundStyle(Theme.textMuted).lineLimit(1).fixedSize()
@@ -247,13 +270,17 @@ public struct PopoverView: View {
 
     // MARK: - Buttons
 
+    /// Lime only while a permission step is the thing to do; Open timeline is
+    /// quiet like Pause, so the total leads.
     private var buttons: some View {
-        Button(action: primaryAction) {
+        let loud = !m.phase.canPause
+        return Button(action: primaryAction) {
             Text(primaryTitle)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.onAccent)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.accent))
+                .font(.system(size: 14, weight: loud ? .semibold : .medium))
+                .foregroundStyle(loud ? Theme.onAccent : Theme.text)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(RoundedRectangle(cornerRadius: 10).fill(loud ? Theme.accent : Theme.cardFill))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(loud ? .clear : Theme.border))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

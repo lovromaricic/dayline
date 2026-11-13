@@ -79,6 +79,9 @@ public final class HomeViewModel: ObservableObject {
 
     /// Move by whole days; the app reloads `report`.
     /// Apps and sites from the last week still in Uncategorized, for the Sort note.
+    /// Bumped when a day or week is (re)loaded into view: the window opens,
+    /// another day or week, Day ↔ Week. The charts replay their grow-in.
+    @Published public var replay = 0
     @Published public var unsortedCount = 0
     @Published public var unsortedTotal: Int64 = 0
     /// Opens Settings → Categories & rules.

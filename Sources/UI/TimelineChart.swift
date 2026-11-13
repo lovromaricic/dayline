@@ -15,6 +15,12 @@ struct TimelineChart: View {
 
     /// A bar being dragged to another lane (spec 4: drag-to-correct).
     @State private var drag: (blockID: Int64, dy: CGFloat)?
+    /// Bars grow in from the left, lane by lane, when a day loads.
+    @State private var revealed = true
+    /// A bar keeps its identity between its lane and the Timeline strip, so
+    /// switching views glides it instead of swapping.
+    @Namespace private var barSpace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct Row: Identifiable {
         var id: String
@@ -57,6 +63,8 @@ struct TimelineChart: View {
                     GeometryReader { geo in lane(row, index: index, width: geo.size.width) }.frame(height: laneHeight)
                     Text(Durations.format(row.total))
                         .font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)
+                        .contentTransition(.numericText(value: Double(row.total)))
+                        .animation(reduceMotion ? nil : .smooth, value: row.total)
                         .lineLimit(1).fixedSize()
                         .frame(width: totalWidth, alignment: .trailing)
                 }
@@ -84,6 +92,18 @@ struct TimelineChart: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Today by category")
+        .onAppear(perform: grow)
+        .onChange(of: vm.replay) { grow() }
+    }
+
+    /// Only once the app has loaded something (`replay` > 0); a still render
+    /// such as a snapshot shows the bars at rest.
+    private func grow() {
+        guard !reduceMotion, vm.replay > 0 else { return }
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) { revealed = false }
+        DispatchQueue.main.async { revealed = true }
     }
 
     // MARK: - Lanes
@@ -109,22 +129,14 @@ struct TimelineChart: View {
                     .offset(x: x(region.lowerBound, width))
                     .allowsHitTesting(false)
             }
-            ForEach(row.blocks) { b in
-                let selected = vm.selection == b.id
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(Color(hexString: b.category.color))
-                    .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.text, lineWidth: selected ? 1.5 : 0))
-                    .frame(width: max(3, x(b.end, width) - x(b.start, width) - 3), height: 22)
-                    .offset(x: x(b.start, width), y: 4 + (drag?.blockID == b.id ? drag!.dy : 0))
-                    .shadow(color: .black.opacity(drag?.blockID == b.id ? 0.5 : 0), radius: 6, y: 2)
-                    .onTapGesture { vm.select(selected ? nil : b.id) }
-                    .gesture(row.category == nil ? nil : DragGesture(minimumDistance: 4)
-                        .onChanged { drag = (b.id, $0.translation.height) }
-                        .onEnded { _ in
-                            if let to = dropTarget, let c = rows[to].category { vm.setCategory(b, c) }
-                            drag = nil
-                        })
-                    .help("\(b.title ?? b.appName) · \(Fmt.range(b.start, b.end, open: b.isOpen))")
+            ZStack(alignment: .topLeading) {
+                ForEach(row.blocks) { b in bar(b, row: row, width: width) }
+            }
+            .frame(width: width, height: laneHeight, alignment: .topLeading)
+            // Tall, so a bar dragged to another lane is not cut off.
+            .mask(alignment: .leading) {
+                Rectangle().frame(width: revealed ? width : 0, height: 2000)
+                    .animation(.smooth(duration: 0.45).delay(Double(index) * 0.04), value: revealed)
             }
             if r.isToday {
                 Rectangle().fill(Theme.accent.opacity(0.9)).frame(width: 2)
@@ -133,6 +145,25 @@ struct TimelineChart: View {
             }
         }
         .frame(width: width, height: laneHeight, alignment: .topLeading)
+    }
+
+    private func bar(_ b: Block, row: Row, width: CGFloat) -> some View {
+        let selected = vm.selection == b.id
+        return RoundedRectangle(cornerRadius: 5)
+            .fill(Color(hexString: b.category.color))
+            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.text, lineWidth: selected ? 1.5 : 0))
+            .frame(width: max(3, x(b.end, width) - x(b.start, width) - 3), height: 22)
+            .matchedGeometryEffect(id: b.id, in: barSpace)
+            .offset(x: x(b.start, width), y: 4 + (drag?.blockID == b.id ? drag!.dy : 0))
+            .shadow(color: .black.opacity(drag?.blockID == b.id ? 0.5 : 0), radius: 6, y: 2)
+            .onTapGesture { vm.select(selected ? nil : b.id) }
+            .gesture(row.category == nil ? nil : DragGesture(minimumDistance: 4)
+                .onChanged { drag = (b.id, $0.translation.height) }
+                .onEnded { _ in
+                    if let to = dropTarget, let c = rows[to].category { vm.setCategory(b, c) }
+                    drag = nil
+                })
+            .help("\(b.title ?? b.appName) · \(Fmt.range(b.start, b.end, open: b.isOpen))")
     }
 
     private var emptyLane: some View {

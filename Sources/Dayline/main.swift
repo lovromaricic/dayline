@@ -39,7 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             openSystemSettings: { [weak self] in self?.engine.openSystemSettings() })
         statusItem = StatusItemController(engine: engine, popover: PopoverView(viewModel: popoverModel, actions: actions))
         // Opening shows the current state as is; only changes while it is open animate.
-        statusItem.onPopoverShow = { [weak self] in self?.refresh(animated: false) }
+        statusItem.onPopoverShow = { [weak self] in
+            self?.refresh(animated: false)
+            self?.popoverModel.opened += 1
+        }
         statusItem.onOpenTimeline = { [weak self] in self?.showTimeline() }
         statusItem.onOpenSettings = { [weak self] in self?.openSettings() }
         timeline = TimelineWindowController(engine: engine)

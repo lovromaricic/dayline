@@ -121,6 +121,8 @@ final class PopoverPanel: NSPanel {
     /// Off-screen twin of the content, only for measuring its size.
     private let measure: NSView
 
+    private var closing = false
+
     init(content: some View) {
         // Two hosts. `measure` reports the size; show/refit apply it with the
         // top edge kept under the menu bar. The visible host never sizes the
@@ -154,13 +156,40 @@ final class PopoverPanel: NSPanel {
         var x = item.midX - size.width / 2
         x = min(max(x, screen.visibleFrame.minX + 8), screen.visibleFrame.maxX - size.width - 8)
         setFrameOrigin(NSPoint(x: x, y: item.minY - 6 - size.height))
+        // Fades in with the content's grow (PopoverView), shadow included.
+        closing = false
+        alphaValue = Self.animates ? 0 : 1
         makeKeyAndOrderFront(nil)
+        guard Self.animates else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().alphaValue = 1
+        }
     }
+
+    private static var animates: Bool { !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     override func cancelOperation(_ sender: Any?) { close() }
 
+    /// A quick fade out, then the real close.
     override func close() {
+        guard isVisible, Self.animates else { return finishClose() }
+        guard !closing else { return }
+        closing = true
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.1
+            animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self, closing else { return }
+            finishClose()
+        })
+    }
+
+    private func finishClose() {
+        closing = false
         super.close()
+        alphaValue = 1
         onClose?()
     }
 

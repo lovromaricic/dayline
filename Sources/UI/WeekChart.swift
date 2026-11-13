@@ -10,6 +10,11 @@ struct WeekChart: View {
     private let labelWidth: CGFloat = 64
     private let totalWidth: CGFloat = 64
 
+    /// Rows grow in from the left, Monday first, when a week loads.
+    @State private var revealed = true
+    @State private var hovered: Int64?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// The scale reaches at least 10 h, so a short week does not fill the width.
     private var scale: Int64 { max(10 * 3600, week.days.map(\.tracked).max() ?? 0) }
     private var hourMarks: [Int] { Array(stride(from: 0, through: Int(scale / 3600), by: 2)) }
@@ -18,20 +23,34 @@ struct WeekChart: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("BY DAY").eyebrow().frame(height: 26)
             VStack(spacing: 0) {
-                ForEach(week.days, id: \.dayStart) { day in row(day) }
+                ForEach(Array(week.days.enumerated()), id: \.element.dayStart) { i, day in row(day, index: i) }
                 axis
             }
             totals
         }
+        .onAppear(perform: grow)
+        .onChange(of: vm.replay) { grow() }
     }
 
-    private func row(_ day: WeekReport.Day) -> some View {
+    /// Only once the app has loaded something (`replay` > 0); a still render
+    /// such as a snapshot shows the bars at rest.
+    private func grow() {
+        guard !reduceMotion, vm.replay > 0 else { return }
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) { revealed = false }
+        DispatchQueue.main.async { revealed = true }
+    }
+
+    private func row(_ day: WeekReport.Day, index: Int) -> some View {
+        let hot = hovered == day.dayStart && !day.isFuture
+        return
         Button(action: { vm.openDay(day.dayStart) }) {
             HStack(spacing: 12) {
                 Text(Fmt.date(day.dayStart).formatted(.dateTime.weekday(.abbreviated)))
                     .font(.system(size: 13))
                     // Today in lime, like the NOW line in the day view.
-                    .foregroundStyle(day.isToday ? Theme.accent : day.tracked > 0 ? Theme.textSecondary : Theme.textFaint)
+                    .foregroundStyle(day.isToday ? Theme.accent : hot ? Theme.text : day.tracked > 0 ? Theme.textSecondary : Theme.textFaint)
                     .frame(width: labelWidth, alignment: .leading)
                 GeometryReader { geo in
                     HStack(spacing: 2) {
@@ -42,6 +61,10 @@ struct WeekChart: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .mask(alignment: .leading) {
+                        Rectangle().frame(width: revealed ? geo.size.width : 0)
+                            .animation(.smooth(duration: 0.45).delay(Double(index) * 0.04), value: revealed)
+                    }
                     .background(alignment: .leading) {
                         if day.tracked == 0 { RoundedRectangle(cornerRadius: 3).fill(Theme.railFill) }
                     }
@@ -50,13 +73,22 @@ struct WeekChart: View {
                 Text(day.tracked > 0 ? Durations.format(day.tracked) : "–")
                     .font(.system(size: 13).monospacedDigit())
                     .foregroundStyle(totalColor(day))
+                    .contentTransition(.numericText(value: Double(day.tracked)))
+                    .animation(reduceMotion ? nil : .smooth, value: day.tracked)
                     .lineLimit(1).fixedSize()
                     .frame(width: totalWidth, alignment: .trailing)
             }
             .frame(height: 32)
+            // Rows open their day: a faint highlight says so.
+            .padding(.horizontal, 8)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(hot ? 0.04 : 0)))
+            .padding(.horizontal, -8)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { inside in
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { hovered = inside ? day.dayStart : (hovered == day.dayStart ? nil : hovered) }
+        }
         .disabled(day.isFuture)
         .help(day.isFuture ? "" : "Open this day")
         .accessibilityLabel(accessibilityLabel(day))
