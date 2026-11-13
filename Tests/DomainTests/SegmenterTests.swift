@@ -141,6 +141,30 @@ private let xcode = Activity(appBundleID: "com.apple.dt.Xcode", appName: "Xcode"
         #expect(r.rows.map(\.call) == [false, true, false, false, true, false])
     }
 
+    @Test func oldCallFlagsNarrowToWhereTheCallStarted() {
+        func seg(_ id: Int64, _ host: String?, title: String? = nil, call: Bool) -> Segment {
+            Segment(id: id, start: id * 10, end: id * 10 + 10, kind: .active, appBundleID: "com.google.Chrome",
+                    appName: "Google Chrome", title: title, host: host, call: call)
+        }
+        let old = [
+            seg(0, "app.slack.com", call: false),
+            seg(1, "teams.microsoft.com", call: true),        // the call starts here
+            seg(2, "app.slack.com", title: "Alex (DM) - Acme - Slack", call: true),
+            seg(3, "figma.com", call: true),
+            seg(4, "teams.microsoft.com", call: true),
+            seg(5, "app.slack.com", call: false),
+        ]
+        #expect(Segment.narrowingCalls(old).map(\.call) == [false, true, false, false, true, false])
+        // A Slack huddle right after a Teams call (one mic run): the huddle
+        // window is a call wherever the call started.
+        let huddle = [seg(1, "teams.microsoft.com", call: true), seg(2, "app.slack.com", call: true),
+                      seg(3, nil, title: "Alex, Sam - Acme - Slack", call: true)]
+        #expect(Segment.narrowingCalls(huddle).map(\.call) == [true, false, true])
+        // Already narrow data stays as it is.
+        let new = Segment.narrowingCalls(old)
+        #expect(Segment.narrowingCalls(new).map(\.call) == new.map(\.call))
+    }
+
     @Test func webAppHostsFromTitles() {
         #expect(Titles.webAppHost("Alex, Sam - Acme - Slack") == "app.slack.com")
         #expect(Titles.webAppHost("(2) Chat | Microsoft Teams") == "teams.microsoft.com")

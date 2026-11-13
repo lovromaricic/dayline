@@ -90,7 +90,7 @@ public struct DayReport: Equatable, Sendable {
         isToday = now >= dayStart && now < dayEnd
         axis = DayReport.axis(dayStart: dayStart, segments: segments, now: isToday ? now : nil)
 
-        let clipped = segments.compactMap { s -> Segment? in
+        let clipped = Segment.narrowingCalls(segments).compactMap { s -> Segment? in
             var s = s
             s.start = max(s.start, dayStart)
             s.end = min(s.end, dayEnd)

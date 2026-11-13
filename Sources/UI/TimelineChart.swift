@@ -121,13 +121,24 @@ struct TimelineChart: View {
             ForEach(hours, id: \.self) { h in
                 Rectangle().fill(Color.white.opacity(0.06)).frame(width: 1).offset(x: x(h, width))
             }
-            // Stripes in a sliver look like noise; only hatch breaks wide enough to read.
-            ForEach(Array((r.away + r.untracked).filter { x($0.upperBound, width) - x($0.lowerBound, width) >= 10 }.enumerated()),
-                    id: \.offset) { _, region in
-                Hatch(color: Color.white.opacity(0.05), stripe: 3, period: 7)
-                    .frame(width: max(1, x(region.upperBound, width) - x(region.lowerBound, width)))
-                    .offset(x: x(region.lowerBound, width))
-                    .allowsHitTesting(false)
+            // Every break is drawn, so no gap is left unexplained: hatched where
+            // there is room for stripes, a faint fill where they would be noise.
+            ForEach(Array((r.away.map { ($0, "Away") } + r.untracked.map { ($0, "Not tracked") }).enumerated()),
+                    id: \.offset) { _, item in
+                let (region, label) = item
+                let w = max(1, x(region.upperBound, width) - x(region.lowerBound, width))
+                Group {
+                    if w >= 10 {
+                        Hatch(color: Color.white.opacity(0.05), stripe: 3, period: 7)
+                    } else {
+                        Rectangle().fill(Color.white.opacity(0.05))
+                    }
+                }
+                .frame(width: w)
+                .contentShape(Rectangle())
+                .onTapGesture { vm.select(nil) }
+                .help("\(label) · \(Fmt.minutes(region.upperBound - region.lowerBound)) · \(Fmt.range(region.lowerBound, region.upperBound, open: false))")
+                .offset(x: x(region.lowerBound, width))
             }
             ZStack(alignment: .topLeading) {
                 ForEach(row.blocks) { b in bar(b, row: row, width: width) }

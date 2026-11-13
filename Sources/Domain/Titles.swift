@@ -37,4 +37,13 @@ public enum Titles {
         "Discord": "discord.com", "Notion": "www.notion.so", "Figma": "www.figma.com", "Linear": "linear.app",
         "Outlook": "outlook.office.com",
     ]
+
+    /// Windows that are a call wherever the call started: a Slack huddle (its
+    /// own browser window with no address, titled with the people in it,
+    /// "Alex, Sam - Acme - Slack"), Google Meet, Zoom, FaceTime.
+    public static func isCallWindow(appBundleID: String, host: String?, title: String?) -> Bool {
+        if ["us.zoom.xos", "com.apple.FaceTime"].contains(appBundleID) { return true }
+        if let host { return host == "meet.google.com" || host == "zoom.us" || host.hasSuffix(".zoom.us") }
+        return title.map(normalize)?.hasSuffix(" - Slack") ?? false
+    }
 }

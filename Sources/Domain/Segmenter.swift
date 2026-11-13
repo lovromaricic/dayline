@@ -149,6 +149,7 @@ public struct Segmenter: Sendable {
     /// call, calendar.google.com is not.
     private func isCallPlace(_ a: Activity) -> Bool {
         guard let p = callPlace else { return true }
+        if Titles.isCallWindow(appBundleID: a.appBundleID, host: a.host, title: a.title) { return true }
         func site(_ x: Activity) -> String? { x.host ?? x.title.flatMap(Titles.webAppHost) }
         return a.appBundleID == p.appBundleID && site(a) == site(p)
     }
@@ -200,5 +201,31 @@ public struct Segmenter: Sendable {
         current = want.map { SegmentDraft(start: at, kind: $0.kind, activity: $0.activity, call: $0.call) }
         if let draft = current { changes.append(.begin(draft)) }
         return changes
+    }
+}
+
+extension Segment {
+    /// Data recorded before the call place existed flags every segment during
+    /// a call. Narrow it the same way the Segmenter does now: a run of call
+    /// segments belongs to where its first one was, and only time there is
+    /// the call. Newer data already looks like this, so it comes out unchanged.
+    public static func narrowingCalls(_ segments: [Segment]) -> [Segment] {
+        func place(_ s: Segment) -> String { s.appBundleID + "|" + (s.host ?? s.title.flatMap(Titles.webAppHost) ?? "") }
+        var out = segments
+        var callPlace: String?
+        for i in out.indices {
+            guard out[i].kind == .active, out[i].call else {
+                callPlace = nil
+                continue
+            }
+            let p = place(out[i])
+            let s = out[i]
+            if let c = callPlace {
+                out[i].call = p == c || Titles.isCallWindow(appBundleID: s.appBundleID, host: s.host, title: s.title)
+            } else {
+                callPlace = p
+            }
+        }
+        return out
     }
 }

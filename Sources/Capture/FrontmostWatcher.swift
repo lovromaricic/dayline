@@ -52,14 +52,12 @@ public final class FrontmostWatcher {
 
     private func attach(_ app: NSRunningApplication?) {
         if let id = app?.bundleIdentifier, Self.ignoredApps.contains(id) { return }
+        // Looking at Dayline itself is not an activity of its own: it counts
+        // toward whatever was in front before, so checking your day leaves
+        // no gap in it (and never shows Dayline as a block).
+        if app?.processIdentifier == getpid() { return }
         detach()
         guard let app else { return }
-        if app.processIdentifier == getpid() {
-            // Time spent looking at Dayline itself is not recorded (like a
-            // private window), so it never shows up as a block or a lane.
-            onActivity?(nil)
-            return
-        }
         self.app = app
         let el = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(el, 1.0)
