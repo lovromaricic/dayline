@@ -203,7 +203,7 @@ struct PrivacyPage: View {
                         }
                     }
                     SettingRow(title: "Delete everything", subtitle: "Removes all tracked time and rules. This cannot be undone.") {
-                        outlineButton("Delete all data…", color: Theme.danger, border: Theme.danger.opacity(0.4)) { vm.onDeleteAll?() }
+                        outlineButton("Delete all data", color: Theme.danger, border: Theme.danger.opacity(0.4)) { vm.onDeleteAll?() }
                     }
                 }
             }

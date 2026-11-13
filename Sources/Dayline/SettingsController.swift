@@ -29,6 +29,9 @@ final class SettingsController {
             self?.write { try db.addRule(kind: kind, pattern: pattern, categoryID: categoryID, origin: .user, at: TrackingEngine.now()) }
         }
         viewModel.onSetRuleCategory = { [weak self] id, categoryID in self?.write { try db.setRuleCategory(id: id, categoryID: categoryID) } }
+        viewModel.onSort = { [weak self] u, categoryID in
+            self?.write { try db.addRule(kind: u.kind, pattern: u.pattern, categoryID: categoryID, origin: .user, at: TrackingEngine.now()) }
+        }
         viewModel.onDeleteRule = { [weak self] id in self?.write { try db.deleteRule(id: id) } }
         viewModel.onAddCategory = { [weak self] name, color in self?.write { try db.addCategory(name: name, color: color) } }
         viewModel.onUpdateCategory = { [weak self] c in self?.write { try db.updateCategory(c) } }
@@ -156,6 +159,7 @@ final class SettingsController {
         let db = engine.database
         viewModel.categories = (try? db.categories()) ?? []
         viewModel.rules = (try? db.rules()) ?? []
+        viewModel.unsorted = engine.unsorted()
         let recent = (try? db.recentApps(since: TrackingEngine.now() - 30 * 86_400)) ?? []
         viewModel.recentApps = recent
         var names = Dictionary(recent, uniquingKeysWith: { a, _ in a })

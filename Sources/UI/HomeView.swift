@@ -73,6 +73,7 @@ public struct HomeView: View {
             } else {
                 header
                 timeline
+                if vm.unsortedCount > 0 { unsortedNote }
                 // A little extra room so the list reads as its own section, not chart labels.
                 BlocksList(vm: vm, searchFocus: $searchFocused)
                     .padding(.top, 12)
@@ -82,6 +83,30 @@ public struct HomeView: View {
             }
         }
         .padding(.top, 16).padding(.horizontal, 32).padding(.bottom, 24)
+    }
+
+    /// Apps and sites from the last week in Uncategorized; Sort opens
+    /// Settings → Categories & rules, where each gets a category (spec 5.4).
+    private var unsortedNote: some View {
+        HStack(spacing: 10) {
+            Circle().fill(Color(hexString: ActivityCategory.uncategorized.color)).frame(width: 8, height: 8)
+            Text(vm.unsortedCount == 1 ? "1 app or site needs a category" : "\(vm.unsortedCount) apps and sites need a category")
+                .foregroundStyle(Theme.textSecondary)
+            + Text("  ·  \(Durations.format(vm.unsortedTotal)) this week").foregroundStyle(Theme.textFaint)
+            Spacer()
+            Button(action: { vm.onSortUnsorted?() }) {
+                Text("Sort").font(.system(size: 13)).foregroundStyle(Theme.text)
+                    .padding(.horizontal, 12).frame(height: 28)
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open Categories & rules")
+        }
+        .font(.system(size: 13))
+        .padding(.leading, 14).padding(.trailing, 10).frame(height: 46)
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border))
+        .padding(.top, 8)
     }
 
     /// Screen 05: shown during the first half hour of a day.

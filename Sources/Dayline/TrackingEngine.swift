@@ -107,7 +107,7 @@ final class TrackingEngine {
         watcher.refresh()
     }
 
-    /// "Delete all data…": close the open segment first so nothing writes to a
+    /// "Delete all data": close the open segment first so nothing writes to a
     /// deleted row, then start fresh in the current state.
     func deleteAllData() throws {
         send(.shutdown)
@@ -144,6 +144,21 @@ final class TrackingEngine {
     }
 
     static func now() -> Int64 { Int64(Date().timeIntervalSince1970) }
+
+    /// "Needs a category" (spec 5.4): apps and sites in Uncategorized over the last week.
+    func unsorted(days: Int = 7) -> [Unsorted] {
+        let cal = Calendar.current, now = Self.now()
+        let today = cal.startOfDay(for: Date())
+        let resolver = categorizer
+        let reports = (0..<days).compactMap { back -> DayReport? in
+            guard let start = cal.date(byAdding: .day, value: -back, to: today),
+                  let end = cal.date(byAdding: .day, value: 1, to: start) else { return nil }
+            let from = Int64(start.timeIntervalSince1970), to = Int64(end.timeIntervalSince1970)
+            let segs = (try? store.segments(from: from, to: to)) ?? []
+            return DayReport(segments: segs, dayStart: from, now: now, resolve: { resolver.resolve($0) })
+        }
+        return Unsorted.collect(reports)
+    }
 
     /// What the "Now" card shows when there is no current block.
     var nowStatus: NowStatus {

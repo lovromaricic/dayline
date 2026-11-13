@@ -29,6 +29,10 @@ public final class SettingsViewModel: ObservableObject {
     /// Apps seen recently, most used first: (bundle id, name).
     @Published public var recentApps: [(String, String)] = []
     @Published public var builtins: [BuiltinRuleRow] = []
+    /// "Needs a category": uncategorized apps and sites from the last week.
+    @Published public var unsorted: [Unsorted] = []
+    /// Adds a rule for the app or site.
+    public var onSort: ((Unsorted, Int64) -> Void)?
 
     public var onBack: (() -> Void)?
     public var onAddRule: ((Rule.Kind, String, Int64) -> Void)?
@@ -188,6 +192,7 @@ private struct CategoriesPage: View {
                         .font(.system(size: 14)).foregroundStyle(Theme.textMuted)
                 }
                 categoriesSection
+                if !vm.unsorted.isEmpty { unsortedSection }
                 rulesSection
             }
             .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32).darkScroller()
@@ -306,6 +311,48 @@ private struct CategoriesPage: View {
         .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.45)))
     }
 
+    // MARK: Needs a category
+
+    /// Same card as Your rules; a pick adds a rule and the row moves down there.
+    private var unsortedSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("NEEDS A CATEGORY · \(vm.unsorted.count)").eyebrow().frame(height: 32)
+            VStack(spacing: 0) {
+                ForEach(Array(vm.unsorted.enumerated()), id: \.element.id) { i, u in
+                    unsortedRow(u).overlay(alignment: .top) {
+                        Rectangle().fill(i == 0 ? .clear : Theme.border).frame(height: 1)
+                    }
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.02)))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+        }
+    }
+
+    private func unsortedRow(_ u: Unsorted) -> some View {
+        HStack(spacing: 14) {
+            kindChip(u.kind).frame(width: 150, alignment: .leading)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(u.name).font(.system(size: 14)).lineLimit(1)
+                Text([u.via, "\(u.blocks) block\(u.blocks == 1 ? "" : "s")"].compactMap { $0 }.joined(separator: " · "))
+                    .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(Durations.format(u.total)).font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)
+                .lineLimit(1).fixedSize()
+            CategoryPicker(categories: vm.userCategories, selected: nil, onNew: { newCategory = "" }) {
+                vm.onSort?(u, $0.id)
+            }
+            .frame(width: 200)
+            // Lines up with the rule rows' delete button.
+            Color.clear.frame(width: 32, height: 32)
+        }
+        .padding(.leading, 20).padding(.trailing, 12).padding(.vertical, 10)
+        .frame(minHeight: 56)
+        .accessibilityElement(children: .contain)
+    }
+
     // MARK: Rules
 
     private var rulesSection: some View {
@@ -416,16 +463,26 @@ func kindChip(_ kind: Rule.Kind) -> some View {
 /// The select used in rule rows: dot, name, chevron.
 struct CategoryPicker: View {
     var categories: [ActivityCategory]
-    var selected: ActivityCategory
+    /// nil shows "Pick a category".
+    var selected: ActivityCategory?
+    /// Adds "New category…" at the bottom, which opens the + New category field.
+    var onNew: (() -> Void)?
     var onPick: (ActivityCategory) -> Void
 
     var body: some View {
         Menu {
             ForEach(categories) { c in Button(c.name) { onPick(c) } }
+            if let onNew {
+                Divider()
+                Button("New category…", action: onNew)
+            }
         } label: {
             HStack(spacing: 8) {
-                Circle().fill(Color(hexString: selected.color)).frame(width: 8, height: 8)
-                Text(selected.name).font(.system(size: 13)).lineLimit(1)
+                if let selected {
+                    Circle().fill(Color(hexString: selected.color)).frame(width: 8, height: 8)
+                }
+                Text(selected?.name ?? "Pick a category").font(.system(size: 13)).lineLimit(1)
+                    .foregroundStyle(selected == nil ? Theme.textMuted : Theme.text)
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.textMuted)
             }
@@ -435,7 +492,7 @@ struct CategoryPicker: View {
             .contentShape(Rectangle())
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
-        .accessibilityLabel("Category, \(selected.name)")
+        .accessibilityLabel(selected.map { "Category, \($0.name)" } ?? "Pick a category")
     }
 }
 

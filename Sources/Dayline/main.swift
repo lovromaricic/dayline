@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timeline = TimelineWindowController(engine: engine)
         timeline.onRulesChanged = { [weak self] in self?.refresh() }
         timeline.onOpenSettings = { [weak self] in self?.openSettings() }
+        timeline.onSortUnsorted = { [weak self] in self?.openSettings(section: .categories) }
         settings = SettingsController(engine: engine)
         settings.onChange = { [weak self] in
             self?.refresh()
@@ -61,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.statusItem.closePopover()
             self?.timeline.open(day: day)
         }
-        MainMenu.install(settings: #selector(openSettings), target: self)
+        MainMenu.install(settings: #selector(openSettingsAction), target: self)
         engine.start()
         // First launch (or permission never granted): show the setup screen.
         if engine.phase == .needsPermission { timeline.show() }
@@ -109,9 +110,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timeline.show()
     }
 
-    @objc private func openSettings() {
+    @objc private func openSettingsAction() { openSettings() }
+
+    private func openSettings(section: SettingsSection = .general) {
         statusItem.closePopover()
-        settings.prepare()
+        settings.prepare(section: section)
         timeline.show(settings: settings.view)
     }
 }

@@ -20,6 +20,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     var onRulesChanged: (() -> Void)?
     /// The toolbar's Settings button.
     var onOpenSettings: (() -> Void)?
+    /// The Sort note: Settings → Categories & rules.
+    var onSortUnsorted: (() -> Void)?
     private static let settingsItem = NSToolbarItem.Identifier("settings")
 
     init(engine: TrackingEngine) {
@@ -29,6 +31,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
                                                     category: { _ in .uncategorized }))
         super.init()
         viewModel.onMoveDay = { [weak self] days in self?.move(days: days) }
+        viewModel.onSortUnsorted = { [weak self] in self?.onSortUnsorted?() }
         viewModel.onPickDay = { [weak self] date in self?.show(day: Self.startOfDay(date)) }
         viewModel.onSetPeriod = { [weak self] _ in self?.reload() }
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
@@ -123,6 +126,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         // showing today when midnight passed.
         if !(window?.isVisible ?? false) { followsToday = true }
         if followsToday { dayStart = Self.startOfDay(Date()) }
+        unsortedAt = 0
         if window?.contentView !== homeView { window?.contentView = homeView }
         reload()
         bringToFront()
@@ -190,7 +194,18 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
                                    resolve: { categorizer.resolve($0) }))
         let week = viewModel.period == .week ? loadWeek() : nil
         if viewModel.week != week { viewModel.week = week }
+        // A week of reports: at most once a minute, or right away after show().
+        let now = TrackingEngine.now()
+        if now - unsortedAt >= 60 {
+            unsortedAt = now
+            let u = engine.unsorted()
+            let total = u.reduce(0) { $0 + $1.total }
+            if viewModel.unsortedCount != u.count { viewModel.unsortedCount = u.count }
+            if viewModel.unsortedTotal != total { viewModel.unsortedTotal = total }
+        }
     }
+
+    private var unsortedAt: Int64 = 0
 
     /// The calendar week around `dayStart`, one DayReport per day up to today.
     private func loadWeek() -> WeekReport {

@@ -49,7 +49,7 @@ extension DaylineDatabase {
         return (bytes, since)
     }
 
-    /// "Delete all data…": tracked time, rules, exclusions and your categories
+    /// "Delete all data": tracked time, rules, exclusions and your categories
     /// go; the seed categories return to their original names and colors.
     /// Preferences (settings table) are kept. The file is compacted after.
     public func deleteAll() throws {

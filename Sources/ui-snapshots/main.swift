@@ -172,7 +172,11 @@ let weekReports = weekStarts.enumerated().filter { $0.element <= dayStart }.map 
 let weekVM = HomeViewModel(report: homeReport)
 weekVM.setPeriod(.week)
 weekVM.week = WeekReport(weekStart: weekStarts[0], reports: weekReports, dayStarts: weekStarts, today: dayStart)
+let unsortedVM = HomeViewModel(report: homeReport)
+unsortedVM.unsortedCount = 3
+unsortedVM.unsortedTotal = 3 * 3600 + 27 * 60
 let homes: [(String, HomeViewModel)] = [
+    ("home-10-unsorted", unsortedVM),
     ("home-09-week", weekVM),
     ("home-08-filtered", filteredVM),
     ("home-01-selected", selectedVM),
@@ -202,6 +206,29 @@ MainActor.assumeIsolated {
         try! rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "\(name).png"))
         print("wrote \(name).png")
     }
+}
+
+// Settings has scroll views, which ImageRenderer leaves blank: draw a real
+// hosting view in an off-screen window instead.
+MainActor.assumeIsolated {
+    let s = SettingsViewModel()
+    s.section = .categories
+    s.categories = ActivityCategory.defaults
+    s.rules = [Rule(id: 1, kind: .site, pattern: "figma.com", categoryID: ActivityCategory.design.id, origin: .correction, createdAt: at(10, 0))]
+    s.unsorted = [
+        Unsorted(kind: .site, pattern: "notion.so", name: "notion.so", via: "Google Chrome", blocks: 14, total: 2 * 3600 + 600),
+        Unsorted(kind: .app, pattern: "com.linear", name: "Linear", via: nil, blocks: 6, total: 3900),
+        Unsorted(kind: .app, pattern: "com.raycast.macos", name: "Raycast", via: nil, blocks: 9, total: 720),
+    ]
+    let host = NSHostingView(rootView: SettingsView(viewModel: s).frame(width: 1200, height: 716))
+    let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: 716), styleMask: [.borderless], backing: .buffered, defer: false)
+    win.contentView = host
+    host.layoutSubtreeIfNeeded()
+    RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+    let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+    host.cacheDisplay(in: host.bounds, to: rep)
+    try! rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "settings-categories-unsorted.png"))
+    print("wrote settings-categories-unsorted.png")
 }
 
 if realDay {

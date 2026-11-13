@@ -78,6 +78,11 @@ public final class HomeViewModel: ObservableObject {
     public var onSetStartAtLogin: ((Bool) -> Void)?
 
     /// Move by whole days; the app reloads `report`.
+    /// Apps and sites from the last week still in Uncategorized, for the Sort note.
+    @Published public var unsortedCount = 0
+    @Published public var unsortedTotal: Int64 = 0
+    /// Opens Settings → Categories & rules.
+    public var onSortUnsorted: (() -> Void)?
     public var onMoveDay: ((Int) -> Void)?
     public var onPickDay: ((Date) -> Void)?
     /// The app loads the week (or the day) after a switch.
