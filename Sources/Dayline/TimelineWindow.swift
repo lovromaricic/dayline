@@ -144,9 +144,16 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         bringToFront()
     }
 
+    /// Always ends with the window in front. Since macOS 14 a plain activate()
+    /// is a request the system may decline (the popover never activates
+    /// Dayline), which left Open timeline doing nothing now and then; a
+    /// minimized window also has to be brought back first.
     private func bringToFront() {
-        NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
+        guard let window else { return }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     /// Segment, rule or category changes while the window is open.
