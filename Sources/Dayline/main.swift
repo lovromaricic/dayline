@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Opening shows the current state as is; only changes while it is open animate.
         statusItem.onPopoverShow = { [weak self] in self?.refresh(animated: false) }
         statusItem.onOpenTimeline = { [weak self] in self?.showTimeline() }
+        statusItem.onOpenSettings = { [weak self] in self?.openSettings() }
         timeline = TimelineWindowController(engine: engine)
         timeline.onRulesChanged = { [weak self] in self?.refresh() }
         timeline.onOpenSettings = { [weak self] in self?.openSettings() }

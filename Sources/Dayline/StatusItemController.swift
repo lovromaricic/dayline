@@ -38,6 +38,7 @@ final class StatusItemController: NSObject {
     /// The popover's primary button is Open System Settings while permission
     /// is missing, so the menu keeps a way to the timeline in every state.
     var onOpenTimeline: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
 
     func closePopover() { panel.close() }
 
@@ -76,6 +77,9 @@ final class StatusItemController: NSObject {
         panel.close()
         let menu = NSMenu()
         menu.addItem(item("Open timeline") { [weak self] in self?.onOpenTimeline?() })
+        let settings = item("Settings…") { [weak self] in self?.onOpenSettings?() }
+        settings.keyEquivalent = ","  // shows ⌘, as in the app menu
+        menu.addItem(settings)
         menu.addItem(.separator())
         if engine.phase.canPause {
             if case .paused = engine.phase {
