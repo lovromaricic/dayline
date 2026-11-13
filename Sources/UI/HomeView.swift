@@ -69,7 +69,9 @@ public struct HomeView: View {
             StatusBanner(vm: vm)
             header
             timeline
+            // A little extra room so the list reads as its own section, not chart labels.
             BlocksList(vm: vm, searchFocus: $searchFocused)
+                .padding(.top, 12)
             if r.isToday && r.tracked > 0 && r.tracked < 30 * 60 && vm.phase == .tracking {
                 firstDayHint
             }
