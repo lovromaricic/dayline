@@ -43,6 +43,10 @@ public final class SettingsViewModel: ObservableObject {
     @Published public var startAtLogin = false
     @Published public var startAtLoginError: String?
     @Published public var showTotal = true
+    /// End-of-day recap hour; nil is off.
+    @Published public var recapHour: Int?
+    public var recapHours = [17, 18, 19, 20]
+    public var onSetRecapHour: ((Int?) -> Void)?
     @Published public var idleMinutes = 2
     public var idleChoices = [1, 2, 3, 5, 10]
     @Published public var callsActive = true
@@ -186,7 +190,7 @@ private struct CategoriesPage: View {
                 categoriesSection
                 rulesSection
             }
-            .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32)
+            .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32).darkScroller()
             // A click on empty space ends naming; leaving the field saves it.
             .contentShape(Rectangle())
             .onTapGesture { editorFocused = false }

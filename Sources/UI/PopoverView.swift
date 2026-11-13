@@ -236,7 +236,7 @@ public struct PopoverView: View {
                         Text(rail.category.name)
                     }
                     Spacer()
-                    Text(Durations.format(rail.total)).monospacedDigit().foregroundStyle(Theme.textMuted)
+                    Text(Durations.format(rail.total)).monospacedDigit().foregroundStyle(Theme.textMuted).lineLimit(1).fixedSize()
                         .contentTransition(.numericText(value: Double(rail.total)))
                 }
                 .font(.system(size: 14))

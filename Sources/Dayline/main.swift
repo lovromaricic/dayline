@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var refreshTimer: Timer?
     private var timeline: TimelineWindowController!
     private var settings: SettingsController!
+    private var recap: Recap!
 
     func applicationDidFinishLaunching(_ note: Notification) {
         let database: DaylineDatabase
@@ -55,6 +56,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.timeline.refresh()
             self?.settings?.refresh()
         }
+        recap = Recap(engine: engine)
+        recap.onOpenDay = { [weak self] day in
+            self?.statusItem.closePopover()
+            self?.timeline.open(day: day)
+        }
         MainMenu.install(settings: #selector(openSettings), target: self)
         engine.start()
         // First launch (or permission never granted): show the setup screen.
@@ -83,7 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let dayStart = Int64(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)
         let segments = (try? engine.store.segments(from: dayStart, to: dayStart + 86_400)) ?? []
         let categorizer = engine.categorizer
-        let summary = DaySummary(segments: segments, dayStart: dayStart, now: now, resolve: { categorizer.resolve($0) })
+        let report = DayReport(segments: segments, dayStart: dayStart, now: now, resolve: { categorizer.resolve($0) })
+        let summary = DaySummary(report: report)
+        recap.check(report: report, now: now)
         let model = PopoverModel(phase: engine.phase, summary: summary, nowStatus: engine.nowStatus, now: now)
         if model != popoverModel.model {
             if animated, statusItem.isPopoverShown, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {

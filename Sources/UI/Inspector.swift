@@ -155,7 +155,7 @@ struct Inspector: View {
                             HStack {
                                 Text(app.appName)
                                 Spacer()
-                                Text(Durations.format(app.total)).monospacedDigit().foregroundStyle(Theme.textMuted)
+                                Text(Durations.format(app.total)).monospacedDigit().foregroundStyle(Theme.textMuted).lineLimit(1).fixedSize()
                             }
                             .font(.system(size: 14))
                             GeometryReader { geo in

@@ -113,10 +113,13 @@ private struct BlockRow: View {
     var selected: Bool
     var hideTopBorder: Bool
 
+    /// The selected row's details step up from muted, so the fill alone marks it.
+    private var meta: Color { selected ? Theme.textSecondary : Theme.textMuted }
+
     var body: some View {
         HStack(spacing: 14) {
             Text(Fmt.range(block.start, block.end, open: block.isOpen))
-                .font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)
+                .font(.system(size: 13).monospacedDigit()).foregroundStyle(meta)
                 .frame(width: 96, alignment: .leading)
             Circle().fill(Color(hexString: block.category.color)).frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 0) {
@@ -125,13 +128,14 @@ private struct BlockRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(block.edited ? "\(block.category.name) · edited" : block.category.name)
-                .font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                .font(.system(size: 13)).foregroundStyle(meta)
                 .lineLimit(1).frame(width: 150, alignment: .leading)
-            Text(Durations.format(block.duration)).font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)
-                .frame(width: 46, alignment: .trailing)
+            Text(Durations.format(block.duration)).font(.system(size: 13).monospacedDigit()).foregroundStyle(meta)
+                .lineLimit(1).fixedSize()
+                .frame(width: 56, alignment: .trailing)
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 8).fill(selected ? Color(hex: 0x7A9BFF, opacity: 0.10) : .clear))
+        .background(RoundedRectangle(cornerRadius: 8).fill(selected ? Color.white.opacity(0.09) : .clear))
         .overlay(alignment: .top) { Rectangle().fill(hideTopBorder ? .clear : Theme.border).frame(height: 1) }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

@@ -51,7 +51,7 @@ public struct HomeView: View {
             HStack(spacing: 0) {
                 if scrolls {
                     ScrollViewReader { proxy in
-                        ScrollView { content }
+                        ScrollView { content.darkScroller() }
                             .onChange(of: vm.selection) { _, id in
                                 if let id { withAnimation(nil) { proxy.scrollTo(BlocksList.rowID(id)) } }
                             }

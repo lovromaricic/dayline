@@ -57,6 +57,7 @@ struct TimelineChart: View {
                     GeometryReader { geo in lane(row, index: index, width: geo.size.width) }.frame(height: laneHeight)
                     Text(Durations.format(row.total))
                         .font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)
+                        .lineLimit(1).fixedSize()
                         .frame(width: totalWidth, alignment: .trailing)
                 }
                 .frame(height: laneHeight)

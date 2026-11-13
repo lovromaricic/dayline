@@ -159,6 +159,12 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         if dayStart == today || viewModel.period == .week && viewModel.week?.containsToday == true { reload() }
     }
 
+    /// Opens the window on a given day (the recap notification).
+    func open(day: Int64) {
+        show()
+        show(day: day)
+    }
+
     private func show(day: Int64) {
         let today = Self.startOfDay(Date())
         dayStart = min(day, today)

@@ -63,6 +63,8 @@ private func outlineButton(_ title: String, color: Color = Theme.text, border: C
     .buttonStyle(.plain)
 }
 
+private func recapLabel(_ hour: Int?) -> String { hour.map { "At \($0):00" } ?? "Off" }
+
 /// SelectField (spec 8): bordered menu with a chevron.
 private func select<T: Hashable>(_ current: String, options: [T], label: @escaping (T) -> String,
                                  pick: @escaping (T) -> Void) -> some View {
@@ -100,6 +102,12 @@ struct GeneralPage: View {
                     SettingRow(title: "Show today’s total in the menu bar", subtitle: "The ring and time next to the clock.") {
                         toggle("Show today’s total in the menu bar", vm.showTotal, vm.onSetShowTotal)
                     }
+                    SettingRow(title: "End-of-day recap",
+                               subtitle: "One notification with the day’s total. Click it to open the day.") {
+                        select(recapLabel(vm.recapHour), options: [nil] + vm.recapHours.map { Optional($0) }, label: recapLabel) {
+                            vm.onSetRecapHour?($0)
+                        }
+                    }
                 }
                 group("TRACKING") {
                     SettingRow(title: "Count me as away after", subtitle: "No keyboard or mouse activity for this long pauses the clock.",
@@ -128,7 +136,7 @@ struct GeneralPage: View {
                     }
                 }
             }
-            .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32)
+            .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32).darkScroller()
         }
     }
 }
@@ -199,7 +207,7 @@ struct PrivacyPage: View {
                     }
                 }
             }
-            .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32)
+            .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32).darkScroller()
         }
     }
 

@@ -51,6 +51,20 @@ final class TrackingEngine {
         set { setFlag("menubar.showTotal", newValue); onChange?() }
     }
 
+    /// End-of-day recap (spec 5.5): the hour it is sent, nil when off (the default).
+    var recapHour: Int? {
+        get { (try? database.setting("recap.hour")).flatMap { $0 }.flatMap(Int.init) }
+        set { try? database.setSetting("recap.hour", newValue.map(String.init) ?? "off") }
+    }
+
+    static let recapHours = [17, 18, 19, 20]
+
+    /// The day the last recap went out, so it is sent once.
+    var recapSentDay: Int64? {
+        get { (try? database.setting("recap.lastDay")).flatMap { $0 }.flatMap(Int64.init) }
+        set { try? database.setSetting("recap.lastDay", newValue.map(String.init)) }
+    }
+
     /// "Count calls as active": a call keeps you from going away and counts as Meetings.
     var callsActive: Bool {
         get { flag("calls.active", default: true) }

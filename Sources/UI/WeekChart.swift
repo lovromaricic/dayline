@@ -50,6 +50,7 @@ struct WeekChart: View {
                 Text(day.tracked > 0 ? Durations.format(day.tracked) : "–")
                     .font(.system(size: 13).monospacedDigit())
                     .foregroundStyle(totalColor(day))
+                    .lineLimit(1).fixedSize()
                     .frame(width: totalWidth, alignment: .trailing)
             }
             .frame(height: 32)
@@ -104,7 +105,7 @@ struct WeekChart: View {
                         Text(c.category.name).lineLimit(1)
                     }
                     Spacer()
-                    Text(Durations.format(c.total)).monospacedDigit().foregroundStyle(Theme.textMuted)
+                    Text(Durations.format(c.total)).monospacedDigit().foregroundStyle(Theme.textMuted).lineLimit(1).fixedSize()
                 }
                 .font(.system(size: 13))
                 .accessibilityElement(children: .combine)
