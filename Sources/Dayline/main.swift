@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.onOpenTimeline = { [weak self] in self?.showTimeline() }
         timeline = TimelineWindowController(engine: engine)
         timeline.onRulesChanged = { [weak self] in self?.refresh() }
+        timeline.onOpenSettings = { [weak self] in self?.openSettings() }
         settings = SettingsController(engine: engine)
         settings.onChange = { [weak self] in
             self?.refresh()

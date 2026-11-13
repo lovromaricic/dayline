@@ -147,6 +147,14 @@ import Testing
         #expect(try !d.categories().contains { $0.id == ActivityCategory.writing.id })
     }
 
+    @Test func newCategoryCanBeDeleted() throws {
+        let d = try db()
+        let c = try d.addCategory(name: "Admin", color: "#9B7CFF")
+        #expect(try d.categories().contains(c))
+        try d.mergeCategory(c.id, into: ActivityCategory.uncategorized.id)
+        #expect(try !d.categories().contains { $0.id == c.id })
+    }
+
     @Test func exclusionsRoundTrip() throws {
         let d = try db()
         try d.addExclusion(kind: .site, pattern: "bank.example")

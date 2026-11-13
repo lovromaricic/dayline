@@ -32,17 +32,9 @@ final class SettingsController {
         viewModel.onDeleteRule = { [weak self] id in self?.write { try db.deleteRule(id: id) } }
         viewModel.onAddCategory = { [weak self] name, color in self?.write { try db.addCategory(name: name, color: color) } }
         viewModel.onUpdateCategory = { [weak self] c in self?.write { try db.updateCategory(c) } }
-        viewModel.onMergeCategory = { [weak self] from, to in
-            guard let self, confirm("Merge \(from.name) into \(to.name)?",
-                                    "Its time, rules and corrections move to \(to.name), and \(from.name) is removed.",
-                                    button: "Merge") else { return }
-            write { try db.mergeCategory(from.id, into: to.id) }
-        }
         viewModel.onDeleteCategory = { [weak self] c in
-            guard let self, confirm("Delete \(c.name)?",
-                                    "Its time moves to Uncategorized, and rules that used it point there too.",
-                                    button: "Delete", destructive: true) else { return }
-            write { try db.mergeCategory(c.id, into: ActivityCategory.uncategorized.id) }
+            guard let self, let to = askDelete(c) else { return }
+            write { try db.mergeCategory(c.id, into: to.id) }
         }
 
         // General
@@ -112,6 +104,29 @@ final class SettingsController {
         destroy.hasDestructiveAction = true
         destroy.keyEquivalent = ""
         return alert.runModal() == .alertSecondButtonReturn
+    }
+
+    /// Deleting a category asks where its time goes: Uncategorized (a plain
+    /// delete) or another category (a merge). nil when cancelled.
+    private func askDelete(_ c: ActivityCategory) -> ActivityCategory? {
+        // Uncategorized first, so the default is a plain delete.
+        let rest = viewModel.categories.filter { $0.id != c.id }
+        let others = rest.filter { $0.id == ActivityCategory.uncategorized.id }
+            + rest.filter { $0.id != ActivityCategory.uncategorized.id }
+        let alert = NSAlert()
+        alert.messageText = "Delete \(c.name)?"
+        alert.informativeText = "Its time, rules and corrections move to:"
+        alert.alertStyle = .critical
+        let picker = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
+        picker.addItems(withTitles: others.map(\.name))
+        alert.accessoryView = picker
+        // Cancel first so it owns Return and Escape; Delete needs a click.
+        alert.addButton(withTitle: "Cancel")
+        let delete = alert.addButton(withTitle: "Delete")
+        delete.hasDestructiveAction = true
+        delete.keyEquivalent = ""
+        guard alert.runModal() == .alertSecondButtonReturn, others.indices.contains(picker.indexOfSelectedItem) else { return nil }
+        return others[picker.indexOfSelectedItem]
     }
 
     /// Fresh values before the page is shown.

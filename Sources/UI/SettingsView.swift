@@ -36,8 +36,7 @@ public final class SettingsViewModel: ObservableObject {
     public var onDeleteRule: ((Int64) -> Void)?
     public var onAddCategory: ((String, String) -> Void)?
     public var onUpdateCategory: ((ActivityCategory) -> Void)?
-    public var onMergeCategory: ((ActivityCategory, ActivityCategory) -> Void)?
-    /// The app confirms first; deleting moves the time to Uncategorized.
+    /// The app confirms first and asks where the time goes (Uncategorized by default).
     public var onDeleteCategory: ((ActivityCategory) -> Void)?
 
     // General (screen 08)
@@ -174,6 +173,7 @@ private struct CategoriesPage: View {
     @State private var newColor = ActivityCategory.palette[6]
     @State private var renaming: Int64?
     @State private var renameText = ""
+    @FocusState private var editorFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -187,7 +187,16 @@ private struct CategoriesPage: View {
                 rulesSection
             }
             .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32)
+            // A click on empty space ends naming; leaving the field saves it.
+            .contentShape(Rectangle())
+            .onTapGesture { editorFocused = false }
         }
+    }
+
+    /// Esc: drop the new or renamed name.
+    private func cancelEditing() {
+        renaming = nil
+        newCategory = nil
     }
 
     // MARK: Categories
@@ -199,20 +208,31 @@ private struct CategoriesPage: View {
                 ForEach(vm.userCategories) { c in
                     if renaming == c.id {
                         chipEditor(text: $renameText, color: c.color) {
+                            // Return and the focus loss that follows both land here.
+                            guard renaming == c.id else { return }
+                            renaming = nil
                             var updated = c
                             updated.name = renameText.trimmingCharacters(in: .whitespaces)
-                            if !updated.name.isEmpty { vm.onUpdateCategory?(updated) }
-                            renaming = nil
+                            let taken = vm.categories.contains {
+                                $0.id != c.id && $0.name.caseInsensitiveCompare(updated.name) == .orderedSame
+                            }
+                            if !updated.name.isEmpty && !taken && updated.name != c.name { vm.onUpdateCategory?(updated) }
                         }
                     } else {
                         chip(c)
                     }
                 }
-                if let name = newCategory {
-                    chipEditor(text: Binding(get: { name }, set: { newCategory = $0 }), color: newColor, colorPicker: true) {
-                        let n = name.trimmingCharacters(in: .whitespaces)
-                        if !n.isEmpty { vm.onAddCategory?(n, newColor) }
+                if newCategory != nil {
+                    // The field writes its text back after Return; once saved, that
+                    // must not reopen the editor.
+                    chipEditor(text: Binding(get: { newCategory ?? "" }, set: { if newCategory != nil { newCategory = $0 } }), color: newColor, colorPicker: true) {
+                        // Read the state, not `name`: the text field keeps the closure
+                        // from its first render, when the name was still empty.
+                        guard let typed = newCategory else { return }
                         newCategory = nil
+                        let n = typed.trimmingCharacters(in: .whitespaces)
+                        let taken = vm.categories.contains { $0.name.caseInsensitiveCompare(n) == .orderedSame }
+                        if !n.isEmpty && !taken { vm.onAddCategory?(n, newColor) }
                     }
                 } else {
                     Button(action: { newCategory = "" }) {
@@ -228,31 +248,31 @@ private struct CategoriesPage: View {
     }
 
     private func chip(_ c: ActivityCategory) -> some View {
-        HStack(spacing: 8) {
-            Circle().fill(Color(hexString: c.color)).frame(width: 8, height: 8)
-            Text(c.name).font(.system(size: 13))
-        }
-        .padding(.horizontal, 14).frame(height: 32)
-        .overlay(Capsule().strokeBorder(Theme.border))
-        .contentShape(Capsule())
-        .contextMenu {
-            Button("Rename…") { renameText = c.name; renaming = c.id }
-            Menu("Color") {
-                ForEach(ActivityCategory.palette, id: \.self) { hex in
-                    Button(action: { var u = c; u.color = hex; vm.onUpdateCategory?(u) }) {
-                        Label(hex, systemImage: hex == c.color ? "checkmark.circle.fill" : "circle.fill")
-                    }
-                }
+        // A click opens the menu too: right-click alone hid Delete.
+        Menu {
+            chipMenu(c)
+        } label: {
+            HStack(spacing: 8) {
+                Circle().fill(Color(hexString: c.color)).frame(width: 8, height: 8)
+                Text(c.name).font(.system(size: 13))
             }
-            Menu("Merge into") {
-                ForEach(vm.categories.filter { $0 != c }) { other in
-                    Button(other.name) { vm.onMergeCategory?(c, other) }
-                }
-            }
-            Divider()
-            Button("Delete…") { vm.onDeleteCategory?(c) }
+            .padding(.horizontal, 14).frame(height: 32)
+            .overlay(Capsule().strokeBorder(Theme.border))
+            .contentShape(Capsule())
         }
-        .help("Right-click to rename, recolor, merge or delete")
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .contextMenu { chipMenu(c) }
+        .help("Rename, recolor or delete")
+        .accessibilityLabel("\(c.name) category")
+    }
+
+    @ViewBuilder private func chipMenu(_ c: ActivityCategory) -> some View {
+        Button("Rename…") { renameText = c.name; renaming = c.id }
+        Menu("Color") {
+            ColorChoices(selected: c.color) { hex in var u = c; u.color = hex; vm.onUpdateCategory?(u) }
+        }
+        Divider()
+        Button("Delete…") { vm.onDeleteCategory?(c) }
     }
 
     private func chipEditor(text: Binding<String>, color: String, colorPicker: Bool = false,
@@ -260,9 +280,7 @@ private struct CategoriesPage: View {
         HStack(spacing: 8) {
             if colorPicker {
                 Menu {
-                    ForEach(ActivityCategory.palette, id: \.self) { hex in
-                        Button(hex) { newColor = hex }
-                    }
+                    ColorChoices(selected: newColor) { newColor = $0 }
                 } label: {
                     Circle().fill(Color(hexString: color)).frame(width: 10, height: 10)
                 }
@@ -271,9 +289,14 @@ private struct CategoriesPage: View {
             } else {
                 Circle().fill(Color(hexString: color)).frame(width: 8, height: 8)
             }
-            TextField("Name", text: text, onCommit: commit)
+            TextField("Name", text: text)
+                .onSubmit(commit)
                 .textFieldStyle(.plain).font(.system(size: 13)).frame(width: 140)
-                .onExitCommand { renaming = nil; newCategory = nil }
+                .focused($editorFocused)
+                .onAppear { editorFocused = true }
+                // The field editor eats Esc before onExitCommand, so catch the key itself.
+                .onKeyPress(.escape) { cancelEditing(); return .handled }
+                .onChange(of: editorFocused) { _, focused in if !focused { commit() } }
         }
         .padding(.horizontal, 14).frame(height: 32)
         .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.45)))
@@ -519,5 +542,39 @@ struct FlowLayout: Layout {
             x += s.width + spacing
             rowHeight = max(rowHeight, s.height)
         }
+    }
+}
+
+/// The category palette as menu items: a coloured dot and a plain name, the
+/// current one checked. Menus draw SF Symbols in grey, so the dots are images.
+private struct ColorChoices: View {
+    let selected: String
+    let pick: (String) -> Void
+
+    static let names: [String: String] = [
+        "#4EA7FC": "Blue", "#FC7840": "Orange", "#E8789E": "Pink", "#27A644": "Green",
+        "#00B8CC": "Teal", "#F0BF00": "Yellow", "#9B7CFF": "Purple", "#5E6AD2": "Indigo",
+        "#B4E04E": "Lime", "#FF5F5F": "Red", "#D9A066": "Tan", "#8A8F98": "Grey",
+    ]
+
+    var body: some View {
+        ForEach(ActivityCategory.palette, id: \.self) { hex in
+            Toggle(isOn: Binding(get: { hex.caseInsensitiveCompare(selected) == .orderedSame }, set: { _ in pick(hex) })) {
+                Label { Text(Self.names[hex] ?? hex) } icon: { Image(nsImage: Self.dot(hex)) }
+            }
+        }
+    }
+
+    static func dot(_ hex: String) -> NSImage {
+        let v = UInt32(hex.dropFirst(), radix: 16) ?? 0x8A8F98
+        let color = NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255,
+                            blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 }

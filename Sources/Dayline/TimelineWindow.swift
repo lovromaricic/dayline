@@ -5,7 +5,7 @@ import UI
 
 /// The main window. Loads a day's segments into a DayReport and keeps today live.
 /// Settings open in the same window, in place of the timeline.
-final class TimelineWindowController: NSObject, NSWindowDelegate {
+final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDelegate {
     private let engine: TrackingEngine
     private let viewModel: HomeViewModel
     private var window: NSWindow?
@@ -18,6 +18,9 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
     private var segments: [Segment] = []
     /// Rules changed: the popover and menu bar total need a refresh too.
     var onRulesChanged: (() -> Void)?
+    /// The toolbar's Settings button.
+    var onOpenSettings: (() -> Void)?
+    private static let settingsItem = NSToolbarItem.Identifier("settings")
 
     init(engine: TrackingEngine) {
         self.engine = engine
@@ -185,9 +188,15 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
         w.title = "Dayline"
-        // An empty compact toolbar gives a 38 pt title bar with the window
-        // buttons centered in it, so they line up with our header.
-        w.toolbar = NSToolbar(identifier: "DaylineMain")
+        // A compact toolbar gives a 38 pt title bar with the window buttons
+        // centered in it, so they line up with our header. Its one item is
+        // Settings: a real toolbar item, because the title bar swallows
+        // clicks meant for SwiftUI buttons drawn under it.
+        let toolbar = NSToolbar(identifier: "DaylineMain")
+        toolbar.delegate = self
+        toolbar.allowsUserCustomization = false
+        toolbar.displayMode = .iconOnly
+        w.toolbar = toolbar
         w.toolbarStyle = .unifiedCompact
         w.titlebarSeparatorStyle = .none
         w.appearance = NSAppearance(named: .darkAqua)
@@ -204,6 +213,29 @@ final class TimelineWindowController: NSObject, NSWindowDelegate {
         w.delegate = self
         return w
     }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace, Self.settingsItem]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarDefaultItemIdentifiers(toolbar)
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard id == Self.settingsItem else { return nil }
+        let item = NSToolbarItem(itemIdentifier: id)
+        item.label = "Settings"
+        item.toolTip = "Settings (⌘,)"
+        item.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Settings")
+        item.isBordered = true
+        item.target = self
+        item.action = #selector(settingsClicked)
+        return item
+    }
+
+    @objc private func settingsClicked() { onOpenSettings?() }
 
     func windowWillClose(_ notification: Notification) {
         timer?.invalidate()
