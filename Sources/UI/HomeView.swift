@@ -134,9 +134,10 @@ public struct HomeView: View {
     }
 
     private var totalSubtitle: String {
-        if r.awayTotal >= 60 { return "tracked · \(Fmt.minutes(r.awayTotal)) away" }
-        if r.isToday, let first = r.firstActivity, r.tracked < 30 * 60 { return "tracked · since \(Fmt.clock(first))" }
-        return r.isToday ? "tracked today" : "tracked"
+        let tracked = r.isToday ? "Tracked today" : "Tracked"
+        if r.awayTotal >= 60 { return "\(Fmt.minutes(r.awayTotal)) away from your Mac" }
+        if r.isToday, let first = r.firstActivity, r.tracked < 30 * 60 { return "\(tracked) · since \(Fmt.clock(first))" }
+        return tracked
     }
 
     /// Spec 5.3: a quiet chevron pair next to the date; click the date for a picker.

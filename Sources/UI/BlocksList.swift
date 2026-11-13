@@ -18,14 +18,14 @@ struct BlocksList: View {
                         .padding(.leading, -12)
                 }
                 Spacer()
-                TextField("Search tab titles", text: $vm.search)
+                TextField("Search", text: $vm.search)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .focused(searchFocus)
                     .padding(.horizontal, 12)
                     .frame(width: 200, height: 32)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Theme.railFill))
-                    .accessibilityLabel("Search tab titles and apps")
+                    .accessibilityLabel("Search blocks by title, app or site")
                     .onExitCommand { vm.search = ""; searchFocus.wrappedValue = false }
                 Menu {
                     Button("All categories") { vm.categoryFilter = nil }
