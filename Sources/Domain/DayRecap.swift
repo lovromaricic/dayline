@@ -22,8 +22,8 @@ public struct DayRecap: Equatable, Sendable {
         // "Mostly" needs a clear lead: 40% of the day and half again the runner-up.
         let second = lanes.count > 1 ? lanes[1].total : 0
         let mix = Double(lanes[0].total) >= 0.4 * Double(r.tracked) && lanes[0].total * 2 >= second * 3
-            ? "Mostly \(lanes[0].category.name)."
-            : "A mix of \(lanes[0].category.name) and \(lanes[1].category.name)."
+            ? "Mostly \(lanes[0].category.shortName)."
+            : "A mix of \(lanes[0].category.shortName) and \(lanes[1].category.shortName)."
         let meetings = r.lanes.first { $0.category.id == ActivityCategory.meetings.id }?.total ?? 0
 
         // The most notable thing wins: a long day, then a meeting-heavy one,

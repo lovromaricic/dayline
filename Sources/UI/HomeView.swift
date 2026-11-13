@@ -178,7 +178,8 @@ public struct HomeView: View {
         HStack(alignment: .bottom, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
                 dayNavigation
-                (Text(first) + Text("\n") + Text(second).foregroundColor(Theme.textMuted))
+                // One sentence that wraps where it must; the second half is grey.
+                (Text(first) + Text(" ") + Text(second).foregroundColor(Theme.textMuted))
                     .font(.system(size: 30, weight: .light))
                     .tracking(-0.3)
                     .lineSpacing(1)

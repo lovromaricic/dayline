@@ -71,8 +71,8 @@ public struct WeekReport: Equatable, Sendable {
                 : ("Nothing was tracked this week.", "Dayline was off, paused or away.")
         }
         let first = Double(top.total) >= 0.4 * Double(tracked) || categories.count == 1
-            ? "Mostly \(top.category.name)\(when),"
-            : "A mix of \(categories[0].category.name) and \(categories[1].category.name)\(when),"
+            ? "Mostly \(top.category.shortName)\(when),"
+            : "A mix of \(categories[0].category.shortName) and \(categories[1].category.shortName)\(when),"
         let longest = days.max { $0.tracked < $1.tracked }!
         let weekday = Date(timeIntervalSince1970: TimeInterval(longest.dayStart)).formatted(.dateTime.weekday(.wide))
         if trackedDays == 1 { return (first, containsToday ? "only \(weekday) so far." : "only \(weekday) was tracked.") }

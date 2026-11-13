@@ -286,9 +286,9 @@ public struct DayReport: Equatable, Sendable {
         let first: String
         guard let top = lanes.first else { return ("Only short moments\(when).", "Blocks appear once something lasts a minute.") }
         if Double(top.total) >= 0.4 * Double(tracked) || lanes.count == 1 {
-            first = "Mostly \(top.category.name)\(when),"
+            first = "Mostly \(top.category.shortName)\(when),"
         } else {
-            first = "A mix of \(lanes[0].category.name) and \(lanes[1].category.name)\(when),"
+            first = "A mix of \(lanes[0].category.shortName) and \(lanes[1].category.shortName)\(when),"
         }
         guard let focus = longestFocus else { return (first, "in short stretches.") }
         let hour = calendar.component(.hour, from: Date(timeIntervalSince1970: TimeInterval(focus.start)))

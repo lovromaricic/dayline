@@ -4,6 +4,11 @@ import Foundation
 public struct ActivityCategory: Hashable, Identifiable, Sendable {
     public var id: Int64
     public var name: String
+    /// For sentences: "Browsing and research" reads as "Browsing", so
+    /// "A mix of Meetings and Browsing" has one "and" and fits on a line.
+    public var shortName: String {
+        name.components(separatedBy: " and ").first.map { $0.isEmpty ? name : $0 } ?? name
+    }
     /// "#RRGGBB"
     public var color: String
 
