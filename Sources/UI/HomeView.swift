@@ -6,6 +6,7 @@ public struct HomeView: View {
     @ObservedObject var vm: HomeViewModel
     @FocusState private var searchFocused: Bool
     @State private var pickingDay = false
+    @State private var selectedRow: CGRect?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// ImageRenderer cannot draw ScrollView content; snapshots turn it off.
     private let scrolls: Bool
@@ -51,17 +52,34 @@ public struct HomeView: View {
     private var home: some View {
             HStack(spacing: 0) {
                 if scrolls {
-                    ScrollViewReader { proxy in
-                        ScrollView { content.darkScroller() }
-                            .onChange(of: vm.selection) { _, id in
-                                if let id { withAnimation(nil) { proxy.scrollTo(BlocksList.rowID(id)) } }
-                            }
+                    GeometryReader { viewport in
+                        ScrollViewReader { proxy in
+                            ScrollView { content.darkScroller() }
+                                .coordinateSpace(name: SelectedRowFrame.space)
+                                .onPreferenceChange(SelectedRowFrame.self) { selectedRow = $0 }
+                                .onChange(of: vm.selection) { _, id in
+                                    guard let id else { return }
+                                    // After layout, so the row has reported where it is.
+                                    DispatchQueue.main.async {
+                                        reveal(id, proxy: proxy, height: viewport.size.height)
+                                    }
+                                }
+                        }
                     }
                 } else {
                     content.frame(maxHeight: .infinity, alignment: .top)
                 }
                 Inspector(vm: vm)
             }
+    }
+
+    /// Selecting a chart bar brings its row into view with a short scroll,
+    /// centred, so you see where you went; a row already on screen stays put.
+    private func reveal(_ id: Int64, proxy: ScrollViewProxy, height: CGFloat) {
+        if let f = selectedRow, f.minY >= 0, f.maxY <= height { return }
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+            proxy.scrollTo(BlocksList.rowID(id), anchor: .center)
+        }
     }
 
     private var content: some View {

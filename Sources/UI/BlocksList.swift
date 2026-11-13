@@ -67,6 +67,14 @@ struct BlocksList: View {
                         // Chart bars carry the block id too; the row's own id keeps
                         // scrollTo from jumping up to the chart.
                         .id(BlocksList.rowID(b.id))
+                        // Where the selected row sits, so the window scrolls only if it is out of view.
+                        .background {
+                            if vm.selection == b.id {
+                                GeometryReader { g in
+                                    Color.clear.preference(key: SelectedRowFrame.self, value: g.frame(in: .named(SelectedRowFrame.space)))
+                                }
+                            }
+                        }
                 }
                 if !vm.isFiltering, vm.filteredBlocks.count > HomeViewModel.collapsedCount {
                     Button(vm.showAllBlocks ? "Show fewer" : "Show all \(vm.filteredBlocks.count) blocks") {
@@ -141,4 +149,11 @@ private struct BlockRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
+}
+
+/// The selected row's frame in the home scroll view's viewport.
+struct SelectedRowFrame: PreferenceKey {
+    static let space = "homeScroll"
+    static let defaultValue: CGRect? = nil
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) { value = nextValue() ?? value }
 }
