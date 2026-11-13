@@ -48,10 +48,14 @@ public struct SegmenterConfig: Sendable {
     /// Mic/camera off for less than this does not end a call. Meet drops both
     /// for ~11 s between its preview screen and the call itself.
     public var callGrace: Int64
+    /// A call nobody has touched the keyboard or mouse in for this long (a
+    /// mic left on overnight) stops keeping you active.
+    public var callIdleLimit: Int64
 
-    public init(idleThreshold: Int64 = 120, callGrace: Int64 = 45) {
+    public init(idleThreshold: Int64 = 120, callGrace: Int64 = 45, callIdleLimit: Int64 = 3600) {
         self.idleThreshold = idleThreshold
         self.callGrace = callGrace
+        self.callIdleLimit = callIdleLimit
     }
 }
 
@@ -105,6 +109,10 @@ public struct Segmenter: Sendable {
                     awaySince = nil
                     cut = lastInput
                 }
+            } else if mode == .tracking, suspended.isEmpty, inCall, !isHidden, t - lastInput >= config.callIdleLimit {
+                // The first hour of an untouched call still counts; after it, away.
+                awaySince = lastInput + config.callIdleLimit
+                cut = awaySince!
             } else if mode == .tracking, suspended.isEmpty, !inCall, !isHidden {
                 // Away starts at the last input, or when the call ended if
                 // the user sat through a call without touching anything.
@@ -118,9 +126,11 @@ public struct Segmenter: Sendable {
             if on {
                 // A new call, not the same one coming back within the grace period.
                 if !inCall, case .visible(let a) = foreground { callPlace = a } else if !inCall { callPlace = nil }
+                // Starting a call means you are here; the mic repeating "on"
+                // mid-call does not undo an untouched call going away.
+                if !inCall { awaySince = nil }
                 rawCall = true
                 callOffSince = nil
-                awaySince = nil
             } else if rawCall {
                 rawCall = false
                 callOffSince = t

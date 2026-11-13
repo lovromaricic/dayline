@@ -69,6 +69,18 @@ import Testing
         #expect(r.blocks[0].duration == 30 * 60)
     }
 
+    @Test mutating func awayTotalLeavesOutTheNight() {
+        let r = report([
+            seg(at(0), at(7), "", .away),          // asleep, Mac on
+            seg(at(7), at(8)),
+            seg(at(8), at(8, 30), "", .away),      // a real break
+            seg(at(8, 30), at(9)),
+            seg(at(9), at(23), "", .away),         // evening
+        ])
+        #expect(r.awayTotal == 30 * 60)
+        #expect(r.away.count == 3)                 // the chart still shows all of it
+    }
+
     @Test mutating func awayBreaksBlocks() {
         let r = report([
             seg(at(9), at(9, 20)),

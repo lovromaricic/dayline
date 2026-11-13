@@ -173,6 +173,18 @@ private let xcode = Activity(appBundleID: "com.apple.dt.Xcode", appName: "Xcode"
         #expect(Titles.webAppHost("New Tab") == nil)
     }
 
+    @Test func untouchedCallStopsCountingAfterAnHour() {
+        var r = Recorder()
+        r.send(.startTracking, at: 0)
+        r.send(.activity(chrome("Meet - abc-defg-hij", "https://meet.google.com/abc-defg-hij")), at: 0)
+        r.send(.call(true), at: 0)
+        r.poll(from: 5, to: 3 * 3600, lastInput: 0)   // mic left on, nobody there
+        r.send(.call(true), at: 3 * 3600)             // the mic reports "on" again
+        #expect(r.seg.isAway)
+        #expect(r.rows.last?.kind == .away && r.rows.last?.start == 3600)
+        #expect(r.total(.away) == 2 * 3600)
+    }
+
     @Test func callGraceBridgesMeetPreviewGap() {
         var r = Recorder()
         r.send(.startTracking, at: 0)

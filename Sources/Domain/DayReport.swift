@@ -100,7 +100,6 @@ public struct DayReport: Equatable, Sendable {
         for s in clipped {
             switch s.kind {
             case .away:
-                awayTotal += s.duration
                 append(&away, s.start...s.end)
             case .untracked:
                 append(&untracked, s.start...s.end)
@@ -109,6 +108,14 @@ public struct DayReport: Equatable, Sendable {
                 appTotals[s.appName, default: 0] += s.duration
                 firstActivity = firstActivity ?? s.start
             }
+        }
+        // Breaks while you were working, not the night: away time from the
+        // first activity to the last (to now, today, so a break you are on counts).
+        let active = clipped.filter { $0.kind == .active }
+        if let first = active.first?.start, let lastActive = active.map(\.end).max() {
+            let last = isToday ? max(lastActive, now) : lastActive
+            awayTotal = clipped.filter { $0.kind == .away }
+                .reduce(0) { $0 + max(0, min($1.end, last) - max($1.start, first)) }
         }
         var cache: [Int64: CategoryResolution] = [:]
         for s in clipped where s.kind == .active { cache[s.id] = resolve(s) }
