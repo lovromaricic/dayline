@@ -64,7 +64,10 @@ public struct DayReport: Equatable, Sendable {
     public var awayTotal: Int64 = 0
     public var firstActivity: Int64?
     public var topApps: [AppTotal] = []
+    /// Never a call: Meetings blocks are left out.
     public var longestFocus: Focus?
+    /// Calls of 25 minutes or more, oldest first, for the headline.
+    public var longCalls: [Focus] = []
     public var axis: ClosedRange<Int64>
     /// What you are in right now, from the raw segments: blocks need a
     /// minute and may absorb a short visit into a neighbour, so they cannot
@@ -156,7 +159,9 @@ public struct DayReport: Equatable, Sendable {
         tracked = lanes.reduce(0) { $0 + $1.total }
         topApps = apps.map { AppTotal(appName: $0, total: appTotals[$0]!) }
             .sorted { $0.total != $1.total ? $0.total > $1.total : $0.appName < $1.appName }
-        longestFocus = DayReport.longestFocus(blocks)
+        longestFocus = DayReport.longestFocus(blocks.filter { $0.category.id != ActivityCategory.meetings.id })
+        longCalls = DayReport.stretches(blocks.filter { $0.category.id == ActivityCategory.meetings.id })
+            .filter { $0.duration >= DayReport.focusMinimum }
     }
 
     /// Seconds rounded to whole minutes (as seconds) so they add up to the
@@ -257,22 +262,25 @@ public struct DayReport: Equatable, Sendable {
     }
 
     static func longestFocus(_ blocks: [Block]) -> Focus? {
-        var best: Focus?
-        var cur: Focus?
-        var curTitleLen: Int64 = 0
+        stretches(blocks).max { $0.duration < $1.duration }.flatMap { $0.duration >= focusMinimum ? $0 : nil }
+    }
+
+    /// Blocks in one app with gaps under a minute, joined; oldest first.
+    static func stretches(_ blocks: [Block]) -> [Focus] {
+        var all: [Focus] = []
+        var titleLength: Int64 = 0
         for b in blocks {
-            if var c = cur, c.appName == b.appName, b.start - c.end < mergeGap {
+            if var c = all.last, c.appName == b.appName, b.start - c.end < mergeGap {
                 c.end = b.end
                 c.duration += b.duration
-                if b.duration > curTitleLen { c.title = b.title; curTitleLen = b.duration }
-                cur = c
+                if b.duration > titleLength { c.title = b.title; titleLength = b.duration }
+                all[all.count - 1] = c
             } else {
-                cur = Focus(appName: b.appName, start: b.start, end: b.end, duration: b.duration, title: b.title)
-                curTitleLen = b.duration
+                all.append(Focus(appName: b.appName, start: b.start, end: b.end, duration: b.duration, title: b.title))
+                titleLength = b.duration
             }
-            if let c = cur, c.duration > (best?.duration ?? 0) { best = c }
         }
-        return best.flatMap { $0.duration >= focusMinimum ? $0 : nil }
+        return all
     }
 
     static func visibleBreaks(_ list: [ClosedRange<Int64>]) -> [ClosedRange<Int64>] {
@@ -316,7 +324,10 @@ public struct DayReport: Equatable, Sendable {
         } else {
             first = "A mix of \(lanes[0].category.shortName) and \(lanes[1].category.shortName)\(when),"
         }
-        guard let focus = longestFocus else { return (first, "in short stretches.") }
+        // Focus wins over calls; a call is never called focus.
+        guard let focus = longestFocus ?? longCalls.first else { return (first, "in short stretches.") }
+        if longestFocus == nil, longCalls.count > 2 { return (first, "with long calls all day.") }
+        if longestFocus == nil, longCalls.count == 2 { return (first, "with two long calls.") }
         let hour = calendar.component(.hour, from: Date(timeIntervalSince1970: TimeInterval(focus.start)))
         let part = switch hour {
         case ..<10: "first thing"
@@ -325,6 +336,6 @@ public struct DayReport: Equatable, Sendable {
         case ..<18: "in the afternoon"
         default: "in the evening"
         }
-        return (first, "with a long focus block \(part).")
+        return (first, longestFocus == nil ? "with one long call \(part)." : "with a long focus block \(part).")
     }
 }

@@ -17,6 +17,7 @@ import Testing
         switch s.appBundleID {
         case "xcode", "terminal": .development
         case "slack": .communication
+        case "zoom": .meetings
         default: s.domain == "github.com" ? .development : .browsing
         }
     }
@@ -197,5 +198,23 @@ extension DayReportTests {
         ])
         #expect(r.lanes.map(\.category) == [.development])
         #expect(r.tracked == 28 * 60)                 // 30 min less the glances, in whole minutes
+    }
+}
+
+extension DayReportTests {
+    @Test mutating func aCallIsNeverFocus() {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!   // `day` is a UTC midnight
+        let call = report([seg(at(9, 30), at(10, 40), "zoom"), seg(at(10, 40), at(10, 50))])
+        #expect(call.longestFocus == nil)
+        #expect(call.longCalls.count == 1)
+        #expect(call.headline(calendar: utc).1 == "with one long call first thing.")
+
+        let both = report([seg(at(9), at(10), "zoom"), seg(at(13), at(14))])
+        #expect(both.longestFocus?.appName == "xcode")
+        #expect(both.headline(calendar: utc).1 == "with a long focus block after lunch.")
+
+        let many = report([seg(at(9), at(9, 30), "zoom"), seg(at(11), at(11, 30), "zoom"), seg(at(14), at(14, 30), "zoom")])
+        #expect(many.headline(calendar: utc).1 == "with long calls all day.")
     }
 }

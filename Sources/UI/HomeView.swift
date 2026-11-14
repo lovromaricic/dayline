@@ -6,6 +6,9 @@ public struct HomeView: View {
     @ObservedObject var vm: HomeViewModel
     @FocusState private var searchFocused: Bool
     @State private var pickingDay = false
+    @State private var pickingDayInBar = false
+    /// The big header has scrolled out of view: show the compact bar.
+    @State private var headerGone = false
     @State private var selectedRow: CGRect?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// ImageRenderer cannot draw ScrollView content; snapshots turn it off.
@@ -57,6 +60,14 @@ public struct HomeView: View {
                             ScrollView { content.darkScroller() }
                                 .coordinateSpace(name: SelectedRowFrame.space)
                                 .onPreferenceChange(SelectedRowFrame.self) { selectedRow = $0 }
+                                .onPreferenceChange(HeaderBottom.self) { bottom in
+                                    let gone = bottom < 0
+                                    guard gone != headerGone else { return }
+                                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { headerGone = gone }
+                                }
+                                .overlay(alignment: .top) {
+                                    if headerGone { stickyBar.transition(.opacity) }
+                                }
                                 .onChange(of: vm.selection) { _, id in
                                     guard let id else { return }
                                     // After layout, so the row has reported where it is.
@@ -87,6 +98,11 @@ public struct HomeView: View {
             // App state (paused, access lost or granted) sits above the day's summary.
             StatusBanner(vm: vm)
             summaryHeader
+                .background {
+                    GeometryReader { g in
+                        Color.clear.preference(key: HeaderBottom.self, value: g.frame(in: .named(SelectedRowFrame.space)).maxY)
+                    }
+                }
             if vm.period == .week, let week = vm.week {
                 WeekChart(vm: vm, week: week)
             } else {
@@ -174,10 +190,12 @@ public struct HomeView: View {
     }
 
     /// The date line, the two-line headline and the big total; shared by day and week.
+    /// Top-aligned, so the date line stays put whether the headline takes one
+    /// line or two.
     private func summary(_ first: String, _ second: String, total: Int64, subtitle: String) -> some View {
-        HStack(alignment: .bottom, spacing: 24) {
+        HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
-                dayNavigation
+                dayNavigation(picking: $pickingDay)
                 // One sentence that wraps where it must; the second half is grey.
                 (Text(first) + Text(" ") + Text(second).foregroundColor(Theme.textMuted))
                     .font(.system(size: 30, weight: .light))
@@ -211,19 +229,20 @@ public struct HomeView: View {
 
     /// Spec 5.3: the Day/Week switch, the date, and a quiet chevron pair;
     /// click the date for a picker.
-    private var dayNavigation: some View {
+    /// Two copies (header and sticky bar), each with its own date picker.
+    private func dayNavigation(picking: Binding<Bool>) -> some View {
         let week = vm.period == .week
         return HStack(spacing: 6) {
             PeriodSwitch(vm: vm).padding(.trailing, 8)
-            Button(action: { pickingDay = true }) {
+            Button(action: { picking.wrappedValue = true }) {
                 Text(week ? Fmt.weekEyebrow(vm.week?.weekStart ?? r.dayStart) : Fmt.dayEyebrow(r.dayStart)).eyebrow()
             }
             .buttonStyle(.plain)
             .help(week ? "Pick a week" : "Pick a day")
-            .popover(isPresented: $pickingDay, arrowEdge: .bottom) {
+            .popover(isPresented: picking, arrowEdge: .bottom) {
                 DatePicker("", selection: Binding(
                     get: { Fmt.date(r.dayStart) },
-                    set: { vm.onPickDay?($0); pickingDay = false }),
+                    set: { vm.onPickDay?($0); picking.wrappedValue = false }),
                     in: ...Date(), displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .labelsHidden()
@@ -232,6 +251,25 @@ public struct HomeView: View {
             chevron("chevron.left", label: week ? "Previous week" : "Previous day", enabled: true) { vm.onMoveDay?(-1) }
             chevron("chevron.right", label: week ? "Next week" : "Next day", enabled: !atLatest) { vm.onMoveDay?(1) }
         }
+    }
+
+    /// Once the header scrolls away: the same date line and the total, small.
+    private var stickyBar: some View {
+        let total = vm.period == .week ? vm.week?.tracked ?? 0 : r.tracked
+        return HStack(spacing: 0) {
+            dayNavigation(picking: $pickingDayInBar)
+            Spacer(minLength: 16)
+            Text(Durations.format(total))
+                .contentTransition(.numericText(value: Double(total)))
+                .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: total)
+                .font(.system(size: 20, weight: .light).monospacedDigit())
+                .tracking(-0.4)
+                .accessibilityLabel("Total \(Durations.format(total))")
+        }
+        .padding(.horizontal, 32)
+        .frame(height: 48)
+        .background(Theme.surfaceWindow)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: 1) }
     }
 
     private func chevron(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -300,4 +338,10 @@ private struct PeriodSwitch: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Show a day or a week")
     }
+}
+
+/// Where the big header ends, in the scroll view's space; below 0 it is gone.
+private struct HeaderBottom: PreferenceKey {
+    static let defaultValue: CGFloat = .infinity
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = min(value, nextValue()) }
 }

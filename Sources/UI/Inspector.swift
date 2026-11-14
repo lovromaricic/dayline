@@ -185,7 +185,7 @@ struct Inspector: View {
                     }
                 } else {
                     Text("Not enough yet").font(.system(size: 26, weight: .light)).padding(.top, 6)
-                    Text("Stretches of 25 minutes or more in one app show up here.")
+                    Text("Stretches of 25 minutes or more in one app show up here. Calls don’t count.")
                         .font(.system(size: 13)).foregroundStyle(Theme.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
