@@ -4,7 +4,17 @@ An automatic time tracker for macOS. Dayline sits in the menu bar and records wh
 
 Everything stays on your Mac in one SQLite file. Dayline has no account and makes no network requests.
 
-![Dayline icon](Resources/AppIcon.png)
+<img src="Resources/AppIcon.png" alt="Dayline icon" width="96">
+
+![The day view: time by category, the blocks list and a selected block](docs/screenshots/day.png)
+
+| The week | The menu bar popover |
+|---|---|
+| ![The week view: each day split by category](docs/screenshots/week.png) | <img src="docs/screenshots/popover.png" alt="The popover: today's total, what you are in now and the top categories" width="320"> |
+
+![Settings: categories, apps and sites that need a category, your rules and the never-track list](docs/screenshots/settings.png)
+
+The screenshots use sample data and are rendered with `swift run ui-snapshots`.
 
 ## What it sees, and what it never sees
 
@@ -25,7 +35,7 @@ Chrome Incognito windows are skipped by default, and any app or site can be excl
 ## Build and install
 
 ```bash
-git clone <this repository> dayline && cd dayline
+git clone https://github.com/lovromaricic/dayline.git && cd dayline
 ./scripts/install.sh
 ```
 
@@ -44,8 +54,10 @@ Dayline is not notarized. If you download a build instead of building it, macOS 
 ## Using it
 
 - **Menu bar:** the ring fills toward 8 hours of tracked time. Click for today's summary, ⌥-click to pause or resume, right-click for pause lengths, Open timeline and Quit.
-- **Timeline** (Open timeline in the popover, or right-click the menu bar item): lanes per category, the blocks list and an inspector. Select a block to change its category; Dayline offers to remember it as a rule. Drag a bar to another lane for the same thing. ←/→ moves between days, ↑/↓ through blocks, ⌘F searches.
-- **Settings** (⌘,): start at login, the away threshold, calls, Chrome titles, categories and rules, never-track list, history length, export (CSV, JSON) and delete all.
+- **Timeline** (Open timeline in the popover, or right-click the menu bar item): a one-line summary of the day, lanes per category, the blocks list and an inspector. Select a block to change its category; Dayline offers to remember it as a rule. Drag a bar to another lane for the same thing. ←/→ moves between days, ↑/↓ through blocks, ⌘F searches. Every number adds up: blocks to their category, categories to the day's total.
+- **Week:** the Day/Week switch shows each day of the week split by category, with the week's total and average.
+- **Calls:** while a mic or camera is in use you stay tracked even without typing, and apps with no category of their own count as Meetings.
+- **Settings** (⌘,): start at login, the away threshold, calls, Chrome titles, an optional end-of-day recap notification, categories and rules (with a list of apps and sites that still need a category), never-track list, history length, export (CSV, JSON) and delete all.
 
 ## Data
 

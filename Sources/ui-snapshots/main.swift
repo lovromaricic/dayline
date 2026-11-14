@@ -222,6 +222,7 @@ MainActor.assumeIsolated {
     ]
     s.exclusions = [.init(id: 1, kind: .app, label: "Finder"), .init(id: 2, kind: .app, label: "1Password")]
     s.storageText = "4.2 MB since 9 Nov"
+    s.builtins = BuiltinRules.all.map { BuiltinRuleRow(kind: $0.kind, label: $0.label, category: $0.category) }
     for (name, section, height) in [("settings-categories-unsorted", SettingsSection.categories, 1000.0),
                                     ("settings-privacy", .privacy, 716)] {
         s.section = section
@@ -230,6 +231,22 @@ MainActor.assumeIsolated {
         win.contentView = host
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        host.cacheDisplay(in: host.bounds, to: rep)
+        try! rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "\(name).png"))
+        print("wrote \(name).png")
+    }
+}
+
+// The README's screens: drawn in a real hosting view, so the search field
+// and scrolling content render as in the app.
+MainActor.assumeIsolated {
+    for (name, vm) in [("readme-day", selectedVM), ("readme-week", weekVM)] {
+        let host = NSHostingView(rootView: HomeView(viewModel: vm).frame(width: 1200, height: 716))
+        let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: 716), styleMask: [.borderless], backing: .buffered, defer: false)
+        win.contentView = host
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(1.0))
         let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
         host.cacheDisplay(in: host.bounds, to: rep)
         try! rep.representation(using: .png, properties: [:])!.write(to: out.appending(path: "\(name).png"))
