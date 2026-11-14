@@ -82,8 +82,6 @@ Always launch the app bundle (the scripts use `open`). Running the bare executab
 | `UI` | SwiftUI views for the popover, timeline and Settings. |
 | `Dayline` | The app: wires it all together. |
 
-The product spec and design files are in `design/`; acceptance-test status is in `design/ACCEPTANCE.md`.
-
 ## License
 
 MIT. See [LICENSE](LICENSE). The compiled-in Public Suffix List is under the Mozilla Public License 2.0.

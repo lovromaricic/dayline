@@ -6,7 +6,7 @@ import SwiftUI
 import UI
 
 // Renders the popover in every state with sample data, for comparing
-// against design/screens. Usage: ui-snapshots [output-dir] [--today | --animate]
+// against the design screens. Usage: ui-snapshots [output-dir] [--today | --animate]
 
 // --today renders your real day from the Dayline database (stays in build/, git-ignored).
 let realDay = CommandLine.arguments.contains("--today")
