@@ -12,8 +12,6 @@ Everything stays on your Mac in one SQLite file. Dayline has no account and make
 
 ![Settings: categories, apps and sites that need a category, your rules and the never-track list](docs/screenshots/settings.png)
 
-The screenshots use sample data and are rendered with `swift run ui-snapshots`.
-
 ## What it sees, and what it never sees
 
 | Sees | Never sees |
