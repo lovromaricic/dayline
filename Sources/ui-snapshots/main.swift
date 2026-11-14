@@ -241,7 +241,10 @@ MainActor.assumeIsolated {
 // The README's screens: drawn in a real hosting view, so the search field
 // and scrolling content render as in the app.
 MainActor.assumeIsolated {
-    for (name, vm) in [("readme-day", selectedVM), ("readme-week", weekVM)] {
+    // The day with a block selected, without the "Always categorize" prompt.
+    let readmeDay = HomeViewModel(report: correctedReport)
+    readmeDay.selection = corrected.id
+    for (name, vm) in [("readme-day", readmeDay), ("readme-week", weekVM)] {
         let host = NSHostingView(rootView: HomeView(viewModel: vm).frame(width: 1200, height: 716))
         let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: 716), styleMask: [.borderless], backing: .buffered, defer: false)
         win.contentView = host
