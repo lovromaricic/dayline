@@ -4,8 +4,6 @@ An automatic time tracker for macOS. Dayline sits in the menu bar and records wh
 
 Everything stays on your Mac in one SQLite file. Dayline has no account and makes no network requests.
 
-<img src="Resources/AppIcon.png" alt="Dayline icon" width="96">
-
 ![The day view: time by category, the blocks list and a selected block](docs/screenshots/day.png)
 
 | The week | The menu bar popover |
