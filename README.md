@@ -67,7 +67,6 @@ Dayline is not notarized. If you download a build instead of building it, macOS 
 swift test                       # unit tests
 ./scripts/build-app.sh           # build/Dayline.app
 ./scripts/run-app.sh             # run the build/ copy instead of /Applications
-swift run ui-snapshots           # render screens to build/snapshots for design review
 swift scripts/make-icon.swift    # regenerate Resources/AppIcon.icns
 ./scripts/update-psl.sh          # refresh the compiled-in Public Suffix List
 ```
