@@ -21,7 +21,7 @@ import Testing
             seg(at(10, 15), at(10, 20), .untracked),
         ]
         let d = DaySummary(segments: segs, dayStart: day, now: at(10, 20), category: cat)
-        #expect(d.tracked == 3600)
+        #expect(d.tracked == 59 * 60)                    // the glance has no rail, so no share of the total
         #expect(d.away == 900)
         #expect(d.rails.map(\.category) == [.development])  // 40 s of browsing gets no rail, as in the timeline
         #expect(d.rails[0].bars == [at(9)...at(10)])

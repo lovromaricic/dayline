@@ -96,7 +96,6 @@ public struct DayReport: Equatable, Sendable {
             s.end = min(s.end, dayEnd)
             return s.end > s.start ? s : nil
         }
-        var appTotals: [String: Int64] = [:]
         for s in clipped {
             switch s.kind {
             case .away:
@@ -104,8 +103,6 @@ public struct DayReport: Equatable, Sendable {
             case .untracked:
                 append(&untracked, s.start...s.end)
             case .active:
-                tracked += s.duration
-                appTotals[s.appName, default: 0] += s.duration
                 firstActivity = firstActivity ?? s.start
             }
         }
@@ -139,24 +136,38 @@ public struct DayReport: Equatable, Sendable {
             current = DaySummary.Current(title: open.title ?? open.appName, appName: open.appName, category: c, since: since)
         }
 
+        // Every number comes from the blocks, in whole minutes, so the blocks
+        // add up to their row, the rows and the top apps to the total. Time
+        // that never made a block (glances under a minute) is left out.
+        for (i, m) in DayReport.wholeMinutes(blocks.map(\.duration)).enumerated() { blocks[i].duration = m }
         var order: [ActivityCategory] = []
         var laneBlocks: [ActivityCategory: [Block]] = [:]
-        var laneTotals: [ActivityCategory: Int64] = [:]
-        for s in clipped where s.kind == .active {
-            let c = category(s)
-            if laneTotals[c] == nil { order.append(c) }
-            laneTotals[c, default: 0] += s.duration
+        var apps: [String] = []
+        var appTotals: [String: Int64] = [:]
+        for b in blocks {
+            if laneBlocks[b.category] == nil { order.append(b.category) }
+            laneBlocks[b.category, default: []].append(b)
+            if appTotals[b.appName] == nil { apps.append(b.appName) }
+            appTotals[b.appName, default: 0] += b.duration
         }
-        for b in blocks { laneBlocks[b.category, default: []].append(b) }
-        // A category needs at least one block (a minute or more in one go) to
-        // get a lane; a few glances still count in `tracked`.
-        lanes = order.filter { laneBlocks[$0] != nil }
-            .map { Lane(category: $0, total: laneTotals[$0]!, blocks: laneBlocks[$0] ?? []) }
-            .sorted { $0.total > $1.total }
-
-        topApps = appTotals.filter { $0.value >= DayReport.minBlock }.map { AppTotal(appName: $0.key, total: $0.value) }
+        lanes = order.map { c in Lane(category: c, total: laneBlocks[c]!.reduce(0) { $0 + $1.duration }, blocks: laneBlocks[c]!) }
+            .enumerated().sorted { $0.element.total != $1.element.total ? $0.element.total > $1.element.total : $0.offset < $1.offset }
+            .map(\.element)
+        tracked = lanes.reduce(0) { $0 + $1.total }
+        topApps = apps.map { AppTotal(appName: $0, total: appTotals[$0]!) }
             .sorted { $0.total != $1.total ? $0.total > $1.total : $0.appName < $1.appName }
         longestFocus = DayReport.longestFocus(blocks)
+    }
+
+    /// Seconds rounded to whole minutes (as seconds) so they add up to the
+    /// minutes in their sum: each rounds down, then the leftover minutes go
+    /// to the largest remainders.
+    static func wholeMinutes(_ seconds: [Int64]) -> [Int64] {
+        var minutes = seconds.map { $0 / 60 }
+        let leftover = Int(seconds.reduce(0, +) / 60 - minutes.reduce(0, +))
+        let byRemainder = seconds.indices.sorted { seconds[$0] % 60 != seconds[$1] % 60 ? seconds[$0] % 60 > seconds[$1] % 60 : $0 < $1 }
+        for i in byRemainder.prefix(leftover) { minutes[i] += 1 }
+        return minutes.map { $0 * 60 }
     }
 
     /// The workday 8:00–17:00, widened to whole hours to fit the data.
@@ -213,12 +224,18 @@ public struct DayReport: Equatable, Sendable {
                 prev.segmentIDs += run.segmentIDs
                 prev.edited = prev.edited || run.edited
                 kept[kept.count - 1] = prev
-            } else if i + 1 < runs.count, runs[i + 1].category == run.category, runs[i + 1].start - run.end < mergeGap {
-                runs[i + 1].start = run.start
-                runs[i + 1].duration += run.duration
-                runs[i + 1].segmentIDs = run.segmentIDs + runs[i + 1].segmentIDs
-                runs[i + 1].edited = runs[i + 1].edited || run.edited
-                runs[i + 1].id = run.id
+            } else {
+                // Forward, past short glances at something else (a call's first
+                // seconds, then a peek at Chrome, then the rest of the call).
+                var j = i + 1
+                while j < runs.count, runs[j].category != run.category, runs[j].duration < minBlock,
+                      runs[j].start - run.end < mergeGap { j += 1 }
+                guard j < runs.count, runs[j].category == run.category, runs[j].start - run.end < mergeGap else { continue }
+                runs[j].start = run.start
+                runs[j].duration += run.duration
+                runs[j].segmentIDs = run.segmentIDs + runs[j].segmentIDs
+                runs[j].edited = runs[j].edited || run.edited
+                runs[j].id = run.id
             }
         }
         // Dropping a short interruption leaves two halves of the same block; join them.
@@ -284,7 +301,9 @@ public struct DayReport: Equatable, Sendable {
     /// `trackingNow`: false while paused or without permission, so a fresh
     /// day does not claim "Tracking is on."
     public func headline(trackingNow: Bool = true, calendar: Calendar = .current) -> (String, String) {
-        guard tracked > 0 else {
+        // firstActivity, not tracked: a day of only glances has a zero total
+        // but is not empty.
+        guard firstActivity != nil else {
             return isToday ? ("Nothing tracked yet today.", "Your first blocks appear within a minute.")
                 : ("Nothing was tracked this day.", "Dayline was off, paused or away.")
         }

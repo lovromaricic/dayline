@@ -33,7 +33,7 @@ import Testing
         ])
         #expect(r.blocks.count == 2)
         #expect(r.blocks[0].start == at(9) && r.blocks[0].end == at(9, 40))
-        #expect(r.blocks[0].duration == 39 * 60 + 30)
+        #expect(r.blocks[0].duration == 39 * 60)      // whole minutes
         #expect(r.blocks[0].title == "b.swift")  // the longest segment's title
     }
 
@@ -45,8 +45,9 @@ import Testing
         ])
         #expect(r.blocks.count == 1)
         #expect(r.blocks[0].end == at(9, 40))
-        #expect(r.tracked == 40 * 60)                 // the glance still counts in totals
+        #expect(r.tracked == 39 * 60)                 // Slack has no lane: out of the total; whole minutes
         #expect(r.lanes.map(\.category) == [.development])   // 20 s of Slack gets no lane
+        #expect(r.lanes.reduce(0) { $0 + $1.total } == r.tracked)  // the rows add up to the total
     }
 
     @Test mutating func shortBlockIsAbsorbedBySameCategoryNeighbour() {
@@ -67,6 +68,32 @@ import Testing
         #expect(r.blocks.count == 1)
         #expect(r.blocks[0].start == at(9))
         #expect(r.blocks[0].duration == 30 * 60)
+    }
+
+    @Test mutating func everythingAddsUpInWholeMinutes() {
+        let r = report([
+            seg(at(9), at(9, 10, 50)),                       // 10m 50s
+            seg(at(9, 10, 50), at(9, 20, 40), "slack"),      // 9m 50s
+            seg(at(9, 20, 40), at(9, 25, 50), "chrome"),     // 5m 10s
+        ])
+        // 25m 50s: three blocks rounded down would show 24m.
+        let minutes = r.blocks.map(\.duration)
+        #expect(minutes.allSatisfy { $0 % 60 == 0 })
+        #expect(minutes.reduce(0, +) == r.tracked)
+        #expect(r.lanes.reduce(0) { $0 + $1.total } == r.tracked)
+        #expect(r.topApps.reduce(0) { $0 + $1.total } == r.tracked)
+        #expect(r.tracked == 25 * 60)
+    }
+
+    @Test mutating func shortStartJoinsItsBlockPastAGlance() {
+        let r = report([
+            seg(at(9), at(9, 0, 30)),                        // the first 30 s
+            seg(at(9, 0, 30), at(9, 0, 40), "slack"),        // a 10 s glance elsewhere
+            seg(at(9, 0, 40), at(9, 30)),
+        ])
+        #expect(r.blocks.count == 1)
+        #expect(r.blocks[0].start == at(9))
+        #expect(r.blocks[0].duration == r.lanes[0].total)    // the block and its row agree
     }
 
     @Test mutating func awayTotalLeavesOutTheNight() {
@@ -133,7 +160,7 @@ extension DayReportTests {
         let r = report([seg(at(9), at(9, 0, 40)), seg(at(9, 0, 40), at(9, 1, 10), "slack")])
         #expect(r.lanes.isEmpty)
         #expect(r.topApps.isEmpty)
-        #expect(r.tracked == 70)
+        #expect(r.tracked == 0)                       // the total is what the lanes show
         #expect(r.headline().0 == "Only short moments.")
     }
 
@@ -169,6 +196,6 @@ extension DayReportTests {
             seg(at(9, 20, 40), at(9, 30)),
         ])
         #expect(r.lanes.map(\.category) == [.development])
-        #expect(r.tracked == 30 * 60)
+        #expect(r.tracked == 28 * 60)                 // 30 min less the glances, in whole minutes
     }
 }
