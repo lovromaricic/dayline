@@ -95,7 +95,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     private func setCategory(_ block: Block, _ category: ActivityCategory) {
         let ids = Set(block.segmentIDs)
         let members = segments.filter { ids.contains($0.id) }
-        let unpinned = members.allSatisfy { engine.categorizer.resolve($0, ignoringManual: true).category == category }
+        // A whole call is Meetings until you say otherwise, so any other pick pins it.
+        let unpinned = block.call == nil && members.allSatisfy { engine.categorizer.resolve($0, ignoringManual: true).category == category }
         do {
             try engine.store.setManualCategory(segmentIDs: block.segmentIDs, categoryID: unpinned ? nil : category.id)
         } catch {

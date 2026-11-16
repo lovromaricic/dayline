@@ -34,7 +34,7 @@ struct Inspector: View {
             if let call = b.call {
                 VStack(alignment: .leading, spacing: 16) {
                     field("Call", call.name)
-                    proof(call)
+                    proof(call, in: b)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 16) {
@@ -95,38 +95,64 @@ struct Inspector: View {
         }
     }
 
-    /// "While on the call": what was in front, by app or site.
-    private func proof(_ call: CallDetail) -> some View {
-        let total = CGFloat(max(1, call.totals.reduce(0) { $0 + $1.duration }))
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("While on the call").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
-            GeometryReader { geo in
-                HStack(spacing: 1) {
-                    ForEach(Array(call.totals.enumerated()), id: \.offset) { _, p in
-                        Rectangle().fill(Color(hexString: p.category.color))
-                            .frame(width: max(1, (geo.size.width - CGFloat(call.totals.count - 1)) * CGFloat(p.duration) / total))
+    /// The point of a call block: what you got done while on it, by category
+    /// ("Design 3m"), with the files and tabs under each. The call window
+    /// itself is left out; the call is the whole block.
+    private func proof(_ call: CallDetail, in b: Block) -> some View {
+        let work = call.totals.filter { $0.category != b.category }
+        var order: [ActivityCategory] = []
+        for p in work where !order.contains(p.category) { order.append(p.category) }
+        let span = CGFloat(max(1, b.duration))
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Work during the call").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            if order.isEmpty {
+                Text("Only the call: nothing else was on screen.").font(.system(size: 14)).foregroundStyle(Theme.textMuted)
+            } else {
+                // The whole call, with the work in its colors; the rest stays dim.
+                GeometryReader { geo in
+                    HStack(spacing: 0) {
+                        ForEach(order, id: \.self) { c in
+                            Rectangle().fill(Color(hexString: c.color))
+                                .frame(width: geo.size.width * CGFloat(minutes(work, c)) / span)
+                        }
+                        Spacer(minLength: 0)
                     }
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 2))
-            }
-            .frame(height: 4)
-            .accessibilityHidden(true)
-            ForEach(Array(call.totals.enumerated()), id: \.offset) { _, p in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Circle().fill(Color(hexString: p.category.color)).frame(width: 8, height: 8)
-                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(p.label).font(.system(size: 14)).lineLimit(1).truncationMode(.tail)
-                        if let source = p.source {
-                            Text(source).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
+                .frame(height: 4)
+                .accessibilityHidden(true)
+                ForEach(order, id: \.self) { c in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Circle().fill(Color(hexString: c.color)).frame(width: 8, height: 8)
+                            Text(c.name)
+                            Spacer()
+                            Text(Durations.format(minutes(work, c))).monospacedDigit()
+                        }
+                        .font(.system(size: 14))
+                        let items = work.filter { $0.category == c }
+                        ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, p in
+                            HStack(spacing: 8) {
+                                // "Amazon.de · amazon.de" says it twice.
+                                let source = p.source.flatMap { $0.lowercased() == p.label.lowercased() ? nil : $0 }
+                                Text(source.map { "\(p.label) · \($0)" } ?? p.label).lineLimit(1).truncationMode(.tail)
+                                Spacer()
+                                // One item has the category's minutes already.
+                                if items.count > 1 { Text(Durations.format(p.duration)).monospacedDigit() }
+                            }
+                            .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                            .padding(.leading, 16)
                         }
                     }
-                    Spacer()
-                    Text(Durations.format(p.duration)).font(.system(size: 14)).monospacedDigit().foregroundStyle(Theme.textMuted)
+                    .accessibilityElement(children: .combine)
                 }
-                .accessibilityElement(children: .combine)
             }
         }
+    }
+
+    private func minutes(_ parts: [CallDetail.Part], _ c: ActivityCategory) -> Int64 {
+        parts.filter { $0.category == c }.reduce(0) { $0 + $1.duration }
     }
 
     /// A block from a call you split: one click puts the whole call back.

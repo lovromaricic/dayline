@@ -19,6 +19,14 @@ struct BlocksList: View {
                         .font(.system(size: 12, weight: .medium).monospacedDigit())
                         .tracking(0.96)
                         .padding(.leading, -12)
+                    // Time in this category during calls: shown, never added (it is the calls').
+                    let onCalls = vm.filteredBlocks.reduce(0) { $0 + vm.callMinutes($1) }
+                    if onCalls > 0 {
+                        Text("+ \(Durations.format(onCalls)) ON CALLS")
+                            .font(.system(size: 12, weight: .medium).monospacedDigit()).tracking(0.96)
+                            .foregroundStyle(Theme.textMuted)
+                            .padding(.leading, -8)
+                    }
                 }
                 Spacer()
                 TextField("Search", text: $vm.search)
@@ -59,7 +67,8 @@ struct BlocksList: View {
                         .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
                 }
                 ForEach(Array(rows.enumerated()), id: \.element.id) { i, b in
-                    BlockRow(block: b, selected: vm.selection == b.id,
+                    BlockRow(block: b, selected: vm.selection == b.id, alsoIn: vm.callMinutes(b) > 0 ? vm.categoryFilter : nil,
+                             alsoMinutes: vm.callMinutes(b),
                              hideTopBorder: vm.selection == b.id || (i > 0 && vm.selection == rows[i - 1].id))
                         .onTapGesture { vm.select(vm.selection == b.id ? nil : b.id) }
                         .accessibilityAction { vm.select(vm.selection == b.id ? nil : b.id) }
@@ -107,7 +116,7 @@ struct BlocksList: View {
         if vm.search.isEmpty, let c = vm.categoryFilter, let lane = vm.report.lanes.first(where: { $0.category == c }) {
             return lane.total
         }
-        let blocks = vm.filteredBlocks
+        let blocks = vm.filteredBlocks.filter { vm.callMinutes($0) == 0 }
         return blocks.isEmpty ? nil : blocks.reduce(0) { $0 + $1.duration }
     }
 
@@ -119,13 +128,32 @@ struct BlocksList: View {
 private struct BlockRow: View {
     var block: Block
     var selected: Bool
+    /// A call listed under a category filter, with the time it holds of it.
+    var alsoIn: ActivityCategory?
+    var alsoMinutes: Int64
     var hideTopBorder: Bool
 
-    /// A call says what you were in during it: "While in figma.com, Xcode".
-    private var subtitle: String {
-        guard let call = block.call else { return block.appName }
-        let apps = call.totals.filter { $0.category != block.category }.map(\.label).prefix(2)
-        return apps.isEmpty ? "Call" : "While in " + apps.joined(separator: ", ")
+    /// A call says what you were in during it, each with its category's dot:
+    /// "While in ● Novi kreditni accounti, ● amazon.de".
+    private var subtitle: Text {
+        guard let call = block.call else { return Text(block.appName) }
+        let apps = call.totals.filter { $0.category != block.category }.prefix(2)
+        guard !apps.isEmpty else { return Text("Call") }
+        return apps.enumerated().reduce(Text("While in ")) { text, item in
+            let (i, p) = item
+            return text + Text(i == 0 ? "" : ", ")
+                + Text("● ").font(.system(size: 8)).baselineOffset(1).foregroundColor(Color(hexString: p.category.color))
+                + Text(p.label)
+        }
+    }
+
+    /// "Meetings · 18m design" for a call under the Design filter.
+    private var categoryText: Text {
+        if let c = alsoIn {
+            return Text("\(block.category.name) · ")
+                + Text("\(Durations.format(alsoMinutes)) \(c.shortName.lowercased())").foregroundColor(Color(hexString: c.color))
+        }
+        return Text(block.edited ? "\(block.category.name) · edited" : block.category.name)
     }
 
     /// The selected row's details step up from muted, so the fill alone marks it.
@@ -142,11 +170,11 @@ private struct BlockRow: View {
                     .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
                 VStack(alignment: .leading, spacing: 0) {
                     Text(block.title ?? block.appName).font(.system(size: 14)).lineLimit(1).truncationMode(.tail)
-                    Text(subtitle).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
+                    subtitle.font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text(block.edited ? "\(block.category.name) · edited" : block.category.name)
+            categoryText
                 .font(.system(size: 13)).foregroundStyle(meta)
                 .lineLimit(1).frame(width: 150, alignment: .leading)
             Text(Durations.format(block.duration)).font(.system(size: 13).monospacedDigit()).foregroundStyle(meta)

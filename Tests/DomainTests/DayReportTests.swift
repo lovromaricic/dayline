@@ -241,11 +241,11 @@ extension DayReportTests {
         #expect(call[0].category == .meetings && call[0].duration == 53 * 60)
         #expect(call[0].title == "Slack huddle with Alex")
         // The proof: what was in front, adding up to the block.
-        #expect(call[0].call?.totals.map(\.label) == ["Onboarding", "Slack huddle"])   // the 30 s glance is under a minute
+        #expect(call[0].call?.totals.map(\.label) == ["Onboarding", "Slack huddle window"])   // the 30 s glance is under a minute
         #expect(call[0].call?.totals.first?.source == "figma")
-        #expect(call[0].call?.parts.map(\.label) == ["Slack huddle", "Onboarding", "amazon.de", "Onboarding", "Slack huddle"])
+        #expect(call[0].call?.parts.map(\.label) == ["Slack huddle window", "Onboarding", "amazon.de", "Onboarding", "Slack huddle window"])
         #expect(call[0].call?.totals.reduce(0) { $0 + $1.duration } == call[0].duration)
-        #expect(call[0].call?.parts.first?.label == "Slack huddle")
+        #expect(call[0].call?.parts.first?.label == "Slack huddle window")
         #expect(r.lanes.map(\.category) == [.meetings, .development])  // Figma's time is the call's
         #expect(r.lanes.reduce(0) { $0 + $1.total } == r.tracked)
         #expect(r.tracked == 90 * 60)

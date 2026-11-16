@@ -42,7 +42,8 @@ public struct CallDetail: Equatable, Sendable {
         /// Active seconds; whole minutes in `totals`.
         public var duration: Int64
         /// The window or tab title ("Novi kreditni accounti"), else the site or
-        /// app; the call's own name for the call window.
+        /// app; "Slack huddle window" for the call's own window (the call is
+        /// the whole block, not just this part).
         public var label: String
         /// Where the title is from ("figma.com", "Figma"); nil when the label says it.
         public var source: String?
@@ -305,7 +306,7 @@ public struct DayReport: Equatable, Sendable {
                 let place = s.domain ?? s.appName
                 let title = s.title.map(Titles.withoutAppSuffix).flatMap { $0.isEmpty ? nil : $0 }
                 return call.category == c
-                    ? CallDetail.Part(start: s.start, end: s.end, duration: s.duration, label: call.name, category: call.category)
+                    ? CallDetail.Part(start: s.start, end: s.end, duration: s.duration, label: "\(call.name) window", category: call.category)
                     : CallDetail.Part(start: s.start, end: s.end, duration: s.duration, label: title ?? place,
                                       source: title == nil ? nil : place, category: call.category)
             }

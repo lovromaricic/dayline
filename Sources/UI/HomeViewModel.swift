@@ -165,11 +165,19 @@ public final class HomeViewModel: ObservableObject {
 
     public var isFiltering: Bool { !search.isEmpty || categoryFilter != nil }
 
-    /// Newest first, after search and category filter.
+    /// Time in the filtered category done during a call (Design on a huddle);
+    /// 0 for any other block. It stays the call's in every total.
+    public func callMinutes(_ b: Block) -> Int64 {
+        guard let c = categoryFilter, b.category != c, let call = b.call else { return 0 }
+        return call.totals.filter { $0.category == c }.reduce(0) { $0 + $1.duration }
+    }
+
+    /// Newest first, after search and category filter. A category also lists
+    /// the calls you worked in it on.
     public var filteredBlocks: [Block] {
         let q = search.trimmingCharacters(in: .whitespaces)
         return report.blocks.reversed().filter { b in
-            (categoryFilter == nil || b.category == categoryFilter)
+            (categoryFilter == nil || b.category == categoryFilter || callMinutes(b) > 0)
                 && (q.isEmpty || [b.title, b.appName, b.host].contains { $0?.localizedCaseInsensitiveContains(q) ?? false })
         }
     }

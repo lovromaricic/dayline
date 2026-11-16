@@ -216,8 +216,11 @@ let splitDay = callDay.map { s -> Segment in
 let splitReport = DayReport(segments: splitDay, dayStart: dayStart, now: now, resolve: callResolve)
 let splitVM = HomeViewModel(report: splitReport)
 splitVM.selection = splitReport.blocks.first { $0.host == "www.figma.com" }?.id
+let callFilterVM = HomeViewModel(report: callReport)
+callFilterVM.categoryFilter = .design
 let homes: [(String, HomeViewModel)] = [
     ("home-11-call", callVM),
+    ("home-13-call-filter", callFilterVM),
     ("home-12-call-split", splitVM),
     ("home-10-unsorted", unsortedVM),
     ("home-09-week", weekVM),

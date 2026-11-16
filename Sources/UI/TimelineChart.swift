@@ -182,7 +182,7 @@ struct TimelineChart: View {
     private func help(_ b: Block) -> String {
         let base = "\(b.title ?? b.appName) · \(Fmt.range(b.start, b.end, open: b.isOpen))"
         guard let call = b.call else { return base }
-        return base + "\nWhile on it: " + call.totals.map { "\($0.label) \(Durations.format($0.duration))" }.joined(separator: ", ")
+        return base + "\nOn screen: " + call.totals.map { "\($0.label) \(Durations.format($0.duration))" }.joined(separator: ", ")
     }
 
     /// A call's proof: a strip along the bottom of its bar, in the colors of
