@@ -72,6 +72,15 @@ public final class DaylineDatabase {
                                arguments: [e.id, e.name, e.color, ActivityCategory.seed.count])
             }
         }
+        m.registerMigration("v3-hidden-titles") { db in
+            // "Never save titles for": an exclusion that keeps the time. Hidden
+            // titles get a stable label ("Hidden title A") keyed by a keyed hash,
+            // so the title itself is never stored.
+            try db.execute(sql: """
+                ALTER TABLE exclusion ADD COLUMN mode TEXT NOT NULL DEFAULT 'skip';
+                CREATE TABLE title_label (key TEXT PRIMARY KEY, label TEXT NOT NULL);
+                """)
+        }
         return m
     }
 
@@ -103,10 +112,12 @@ public final class DaylineDatabase {
 
     public func exclusions() throws -> Exclusions {
         try pool.read { db in
-            let rows = try Row.fetchAll(db, sql: "SELECT kind, pattern FROM exclusion")
-            return Exclusions(
-                apps: Set(rows.filter { $0["kind"] == "app" }.map { $0["pattern"] }),
-                sites: rows.filter { $0["kind"] == "site" }.map { $0["pattern"] })
+            let rows = try Row.fetchAll(db, sql: "SELECT kind, pattern, mode FROM exclusion")
+            func patterns(_ kind: String, _ mode: ExclusionMode) -> [String] {
+                rows.filter { $0["kind"] == kind && $0["mode"] == mode.rawValue }.map { $0["pattern"] }
+            }
+            return Exclusions(apps: Set(patterns("app", .skip)), sites: patterns("site", .skip),
+                              titleApps: Set(patterns("app", .titles)), titleSites: patterns("site", .titles))
         }
     }
 }

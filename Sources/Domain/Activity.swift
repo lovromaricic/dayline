@@ -97,17 +97,33 @@ public struct SegmentDraft: Equatable, Sendable {
     }
 }
 
-/// Excluded apps and sites are treated as if they did not happen.
+/// What Privacy keeps of an app or site: nothing ("Don't track"), or its
+/// time without the titles ("Never save titles for").
+public enum ExclusionMode: String, Sendable {
+    case skip
+    case titles
+}
+
+/// Excluded apps and sites are treated as if they did not happen; apps and
+/// sites with hidden titles keep their time but never their titles.
 public struct Exclusions: Sendable {
     public var apps: Set<String>
     public var sites: [String]
+    public var titleApps: Set<String>
+    public var titleSites: [String]
 
-    public init(apps: Set<String> = [], sites: [String] = []) {
+    public init(apps: Set<String> = [], sites: [String] = [], titleApps: Set<String> = [], titleSites: [String] = []) {
         self.apps = apps
         self.sites = sites.map { $0.lowercased() }
+        self.titleApps = titleApps
+        self.titleSites = titleSites.map { $0.lowercased() }
     }
 
-    public func excludes(_ a: Activity) -> Bool {
+    public func excludes(_ a: Activity) -> Bool { Self.matches(a, apps: apps, sites: sites) }
+
+    public func hidesTitle(_ a: Activity) -> Bool { Self.matches(a, apps: titleApps, sites: titleSites) }
+
+    private static func matches(_ a: Activity, apps: Set<String>, sites: [String]) -> Bool {
         if apps.contains(a.appBundleID) { return true }
         guard let host = a.host else { return false }
         return sites.contains { host == $0 || host.hasSuffix("." + $0) }

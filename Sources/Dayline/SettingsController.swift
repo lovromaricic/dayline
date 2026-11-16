@@ -61,9 +61,17 @@ final class SettingsController {
 
         // Privacy & data
         viewModel.onSetSkipPrivate = { [weak self] on in engine.skipPrivateWindows = on; self?.reload() }
-        viewModel.onAddExclusion = { [weak self] kind, pattern in
-            self?.write { try db.addExclusion(kind: kind, pattern: pattern); engine.reloadExclusions() }
+        viewModel.onAddExclusion = { [weak self] kind, pattern, mode in
+            guard let self else { return }
+            let hideSaved: Bool? = mode == .titles ? askHideSaved(pattern: pattern, kind: kind) : false
+            guard hideSaved != nil else { return }
+            write {
+                try db.addExclusion(kind: kind, pattern: pattern, mode: mode)
+                if hideSaved == true { try db.hideSavedTitles(kind: kind, pattern: pattern) }
+                engine.reloadExclusions()
+            }
         }
+        viewModel.onSetTitlesOnScreen = { [weak self] m in engine.titlesOnScreen = m; self?.reload(); self?.onChange?() }
         viewModel.onDeleteExclusion = { [weak self] id in
             self?.write { try db.deleteExclusion(id: id); engine.reloadExclusions() }
         }
@@ -111,6 +119,24 @@ final class SettingsController {
         destroy.hasDestructiveAction = true
         destroy.keyEquivalent = ""
         return alert.runModal() == .alertSecondButtonReturn
+    }
+
+    /// Adding to "Never save titles for": from now on, or also the titles
+    /// already saved (replaced by their labels, which cannot be undone).
+    /// nil when cancelled.
+    private func askHideSaved(pattern: String, kind: Rule.Kind) -> Bool? {
+        let name = kind == .app ? appName(pattern) : pattern
+        let alert = NSAlert()
+        alert.messageText = "Never save titles for \(name)?"
+        alert.informativeText = "From now on its window and tab titles are not saved; its time still counts. Titles saved before can be replaced too. That cannot be undone."
+        alert.addButton(withTitle: "From now on")
+        alert.addButton(withTitle: "Also replace saved titles")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return false
+        case .alertSecondButtonReturn: return true
+        default: return nil
+        }
     }
 
     /// Deleting a category asks where its time goes: Uncategorized (a plain
@@ -179,9 +205,11 @@ final class SettingsController {
         }
         // Privacy & data
         viewModel.skipPrivate = engine.skipPrivateWindows
+        viewModel.titlesOnScreen = engine.titlesOnScreen
         viewModel.retentionDays = engine.retentionDays
         viewModel.exclusions = ((try? db.exclusionRows()) ?? []).map {
-            SettingsViewModel.Exclusion(id: $0.id, kind: $0.kind, label: $0.kind == .app ? names[$0.pattern] ?? appName($0.pattern) : $0.pattern)
+            SettingsViewModel.Exclusion(id: $0.id, kind: $0.kind, label: $0.kind == .app ? names[$0.pattern] ?? appName($0.pattern) : $0.pattern,
+                                        mode: $0.mode)
         }
         if let info = try? db.storageInfo() {
             let size = ByteCountFormatter.string(fromByteCount: info.bytes, countStyle: .file)

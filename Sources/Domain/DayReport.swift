@@ -481,3 +481,51 @@ public struct DayReport: Equatable, Sendable {
         return (first, longestFocus == nil ? "with one long call \(part)." : "with a long focus block \(part).")
     }
 }
+
+/// "Hide titles on screen" (Privacy): titles are still saved, just not shown.
+public enum TitlesOnScreen: String, CaseIterable, Sendable {
+    case never, calls, always
+
+    public var label: String {
+        switch self {
+        case .never: "Never"
+        case .calls: "During calls"
+        case .always: "Always"
+        }
+    }
+}
+
+extension DayReport {
+    /// The same day with every window and tab title (and who a call was with)
+    /// left out, for "Hide titles on screen". Apps, sites and times stay.
+    public func hidingTitles() -> DayReport {
+        var r = self
+        let names = Dictionary(calls.flatMap { c in c.segmentIDs.map { ($0, c.name) } }, uniquingKeysWith: { a, _ in a })
+        func hide(_ b: Block) -> Block {
+            var b = b
+            guard var call = b.call else { b.title = nil; return b }
+            call.name = b.segmentIDs.lazy.compactMap { names[$0] }.first ?? "Call"
+            b.title = call.name
+            call.parts = call.parts.map { var p = $0; if let s = p.source { p.label = s; p.source = nil }; return p }
+            var totals: [CallDetail.Part] = []
+            for var p in call.totals {
+                if let s = p.source { p.label = s; p.source = nil }
+                if let i = totals.firstIndex(where: { $0.label == p.label && $0.category == p.category }) {
+                    totals[i].duration += p.duration
+                } else {
+                    totals.append(p)
+                }
+            }
+            call.totals = totals.sorted { $0.duration > $1.duration }
+            b.call = call
+            return b
+        }
+        r.blocks = blocks.map(hide)
+        r.lanes = lanes.map { var l = $0; l.blocks = l.blocks.map(hide); return l }
+        r.calls = calls.map { var c = $0; c.people = nil; return c }
+        r.longestFocus?.title = nil
+        r.longCalls = longCalls.map { var f = $0; f.title = nil; return f }
+        if let c = current { r.current?.title = c.appName }
+        return r
+    }
+}

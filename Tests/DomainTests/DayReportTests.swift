@@ -257,3 +257,20 @@ extension DayReportTests {
         #expect(r.blocks.count == 1 && r.blocks[0].call == nil)
     }
 }
+
+extension DayReportTests {
+    @Test mutating func hidingTitlesKeepsTimesAndApps() {
+        let huddle = "Alex - Acme - Slack"
+        let r = report([
+            seg(at(9), at(9, 30), title: "Secret.swift"),
+            seg(at(9, 30), at(9, 35), "chrome", title: huddle, call: true),
+            seg(at(9, 35), at(9, 50), "figma", title: "Enes Projekt – Figma", call: true),
+        ]).hidingTitles()
+        #expect(r.blocks[0].title == nil && r.blocks[0].appName == "xcode")
+        #expect(r.blocks[1].title == "Slack huddle")                 // not who it was with
+        #expect(r.blocks[1].call?.totals.map(\.label).contains("figma") == true)
+        #expect(r.blocks[1].call?.totals.contains { $0.label.contains("Enes") } == false)
+        #expect(r.calls.first?.people == nil)
+        #expect(r.tracked == 50 * 60)
+    }
+}

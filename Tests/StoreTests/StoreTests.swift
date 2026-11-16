@@ -165,3 +165,36 @@ import Testing
         #expect(try d.exclusionRows().count == 1)
     }
 }
+
+extension StoreTests {
+    @Test func hiddenTitlesGetStableLabels() throws {
+        let d = try DaylineDatabase(url: FileManager.default.temporaryDirectory.appending(path: "dayline-test-\(UUID().uuidString).sqlite"))
+        try d.addExclusion(kind: .site, pattern: "figma.com", mode: .titles)
+        let ex = try d.exclusions()
+        let file = Activity.browser(appBundleID: "com.google.Chrome", appName: "Google Chrome", title: "Enes Projekt broj 2 – FigJam",
+                                    url: URL(string: "https://www.figma.com/board/x"))
+        #expect(ex.hidesTitle(file) && !ex.excludes(file))
+        #expect(try d.hiddenTitle("Enes Projekt broj 2 – FigJam", scope: "figma.com") == "Hidden title A")
+        #expect(try d.hiddenTitle("Other file – Figma", scope: "figma.com") == "Hidden title B")
+        #expect(try d.hiddenTitle("(2) Enes Projekt broj 2 – FigJam", scope: "figma.com") == "Hidden title A")  // badges don't matter
+        #expect(try d.hiddenTitle("Enes Projekt broj 2 – FigJam", scope: "com.figma.Desktop") == "Hidden title A")  // own letters per app
+        #expect(DaylineDatabase.letters(26) == "AA")
+        // One mode per site: moving it to Don't track takes it off the titles list.
+        try d.addExclusion(kind: .site, pattern: "figma.com")
+        #expect(try d.exclusionRows().map(\.mode) == [ExclusionMode.skip])
+    }
+
+    @Test func savedTitlesCanBeReplaced() throws {
+        let d = try DaylineDatabase(url: FileManager.default.temporaryDirectory.appending(path: "dayline-test-\(UUID().uuidString).sqlite"))
+        let store = SegmentStore(database: d)
+        let file = Activity.browser(appBundleID: "com.google.Chrome", appName: "Google Chrome", title: "Secret plan – Figma",
+                                    url: URL(string: "https://www.figma.com/file/x"))
+        let other = Activity.browser(appBundleID: "com.google.Chrome", appName: "Google Chrome", title: "News",
+                                     url: URL(string: "https://example.com"))
+        try store.apply([.begin(SegmentDraft(start: 0, kind: .active, activity: file)), .end(at: 10),
+                         .begin(SegmentDraft(start: 10, kind: .active, activity: other)), .end(at: 20)])
+        #expect(try d.hideSavedTitles(kind: .site, pattern: "figma.com") == 1)
+        #expect(try store.segments(from: 0, to: 100).map(\.title) == ["Hidden title A", "News"])
+        #expect(try d.hideSavedTitles(kind: .site, pattern: "figma.com") == 0)   // already hidden
+    }
+}

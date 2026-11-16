@@ -83,6 +83,17 @@ final class TrackingEngine {
         }
     }
 
+    /// "Hide titles on screen": the timeline and popover leave titles out.
+    var titlesOnScreen: TitlesOnScreen {
+        get { (try? database.setting("titles.onScreen")).flatMap { $0.flatMap(TitlesOnScreen.init) } ?? .never }
+        set { try? database.setSetting("titles.onScreen", newValue.rawValue); onChange?() }
+    }
+
+    /// Titles are hidden right now: always, or during calls while one is on.
+    var hidesTitlesNow: Bool {
+        titlesOnScreen == .always || (titlesOnScreen == .calls && calls.state.inCall)
+    }
+
     var readChromeTitles: Bool {
         get { flag("chrome.titles", default: true) }
         set { setFlag("chrome.titles", newValue); watcher.readChromeTitles = newValue; watcher.refresh() }
@@ -107,6 +118,16 @@ final class TrackingEngine {
         guard let days = retentionDays else { return }
         let cutoff = Int64(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970) - Int64(days) * 86_400
         if let n = try? database.deleteSegments(endedBefore: cutoff), n > 0 { Log.line("retention removed \(n) segments") }
+    }
+
+    /// What is recorded of the app in front: nothing for an excluded app or
+    /// site, and for one with hidden titles a stable label instead of the title.
+    private func recordable(_ a: Activity) -> Activity? {
+        if exclusions.excludes(a) { return nil }
+        guard exclusions.hidesTitle(a), let title = a.title else { return a }
+        var a = a
+        a.title = (try? database.hiddenTitle(title, scope: a.domain ?? a.appBundleID)) ?? "Hidden title"
+        return a
     }
 
     func reloadExclusions() {
@@ -184,7 +205,7 @@ final class TrackingEngine {
     func start() {
         watcher.onActivity = { [weak self] activity in
             guard let self else { return }
-            send(.activity(activity.flatMap { self.exclusions.excludes($0) ? nil : $0 }))
+            send(.activity(activity.flatMap(self.recordable)))
         }
         power.onEvent = { [weak self] event in
             self?.send(event)
@@ -194,6 +215,8 @@ final class TrackingEngine {
             Log.line("call \(state.inCall ? "on" : "off") users=\(state.micUsers)")
             guard let self else { return }
             send(.call(callsActive && state.inCall))
+            // Titles hidden during calls appear and disappear with the call.
+            if titlesOnScreen == .calls { onChange?() }
         }
         permission.onChange = { [weak self] _, new in self?.permissionChanged(new) }
 

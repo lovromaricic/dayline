@@ -157,6 +157,15 @@ struct PrivacyPage: View {
                         toggle("Skip private browsing windows", vm.skipPrivate, vm.onSetSkipPrivate)
                     }
                 }
+                group("TITLES") {
+                    SettingRow(title: "Hide titles on screen", subtitle: titlesSubtitle, first: true) {
+                        select(vm.titlesOnScreen.label, options: TitlesOnScreen.allCases, label: \.label) { vm.onSetTitlesOnScreen?($0) }
+                    }
+                    SettingRow(title: "Never save titles for",
+                               subtitle: "Their time still counts. Titles show as “Hidden title A”, “Hidden title B”.") { EmptyView() }
+                    NeverTrackList(vm: vm, mode: .titles, chipWidth: 64)
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
+                }
                 group("YOUR DATA") {
                     SettingRow(title: "Keep history for", subtitle: "Older days are deleted automatically.", first: true) {
                         select(retentionLabel(vm.retentionDays), options: vm.retentionChoices, label: retentionLabel) { vm.onSetRetention?($0) }
@@ -179,6 +188,14 @@ struct PrivacyPage: View {
         }
     }
 
+    private var titlesSubtitle: String {
+        switch vm.titlesOnScreen {
+        case .never: "Window and tab titles show everywhere."
+        case .calls: "Titles are hidden while you’re on a call. They are still saved."
+        case .always: "Titles are always hidden on screen. They are still saved."
+        }
+    }
+
     private func retentionLabel(_ days: Int?) -> String {
         switch days {
         case nil: "Forever"
@@ -192,6 +209,8 @@ struct PrivacyPage: View {
 /// not recorded at all. Private browsing windows stay on Privacy & data.
 struct NeverTrackList: View {
     @ObservedObject var vm: SettingsViewModel
+    /// The same list serves "Never save titles for" on Privacy & data.
+    var mode = ExclusionMode.skip
     /// Matches the rule rows above it.
     var chipWidth: CGFloat = 150
     @State private var adding = false
@@ -200,7 +219,7 @@ struct NeverTrackList: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(Array(vm.exclusions.enumerated()), id: \.element.id) { i, e in
+            ForEach(Array(items.enumerated()), id: \.element.id) { i, e in
                 HStack(spacing: 14) {
                     kindChip(e.kind).frame(width: chipWidth, alignment: .leading)
                     Text(e.label).font(.system(size: 14)).frame(maxWidth: .infinity, alignment: .leading)
@@ -209,8 +228,8 @@ struct NeverTrackList: View {
                             .frame(width: 32, height: 32).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help("Track it again")
-                    .accessibilityLabel("Stop excluding \(e.label)")
+                    .help(mode == .skip ? "Track it again" : "Save its titles again")
+                    .accessibilityLabel(mode == .skip ? "Stop excluding \(e.label)" : "Save titles for \(e.label) again")
                 }
                 .padding(.leading, 20).padding(.trailing, 12).padding(.vertical, 8)
                 .frame(minHeight: 46)
@@ -228,10 +247,12 @@ struct NeverTrackList: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .overlay(alignment: .top) { Rectangle().fill(vm.exclusions.isEmpty ? .clear : Theme.border).frame(height: 1) }
+                .overlay(alignment: .top) { Rectangle().fill(items.isEmpty ? .clear : Theme.border).frame(height: 1) }
             }
         }
     }
+
+    private var items: [SettingsViewModel.Exclusion] { vm.exclusions.filter { $0.mode == mode } }
 
     private var addRow: some View {
         HStack(spacing: 14) {
@@ -251,7 +272,7 @@ struct NeverTrackList: View {
             if kind == .app {
                 Menu {
                     ForEach(vm.recentApps, id: \.0) { app in
-                        Button(app.1) { vm.onAddExclusion?(.app, app.0); adding = false }
+                        Button(app.1) { vm.onAddExclusion?(.app, app.0, mode); adding = false }
                     }
                 } label: {
                     Text("Choose an app").font(.system(size: 14)).foregroundStyle(Theme.textMuted)
@@ -283,7 +304,7 @@ struct NeverTrackList: View {
         if let slash = p.firstIndex(of: "/") { p = String(p[..<slash]) }
         if p.hasPrefix("www.") { p.removeFirst(4) }
         guard !p.isEmpty else { return }
-        vm.onAddExclusion?(.site, p)
+        vm.onAddExclusion?(.site, p, mode)
         site = ""
         adding = false
     }

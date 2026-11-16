@@ -94,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let segments = (try? engine.store.segments(from: dayStart, to: dayStart + 86_400)) ?? []
         let categorizer = engine.categorizer
         let report = DayReport(segments: segments, dayStart: dayStart, now: now, resolve: { categorizer.resolve($0) })
-        let summary = DaySummary(report: report)
+        let summary = DaySummary(report: engine.hidesTitlesNow ? report.hidingTitles() : report)
         recap.check(report: report, now: now)
         let model = PopoverModel(phase: engine.phase, summary: summary, nowStatus: engine.nowStatus, now: now)
         if model != popoverModel.model {

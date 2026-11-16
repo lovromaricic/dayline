@@ -266,11 +266,13 @@ MainActor.assumeIsolated {
         Unsorted(kind: .app, pattern: "com.linear", name: "Linear", via: nil, blocks: 6, total: 3900),
         Unsorted(kind: .app, pattern: "com.raycast.macos", name: "Raycast", via: nil, blocks: 9, total: 720),
     ]
-    s.exclusions = [.init(id: 1, kind: .app, label: "Finder"), .init(id: 2, kind: .app, label: "1Password")]
+    s.exclusions = [.init(id: 1, kind: .app, label: "Finder"), .init(id: 2, kind: .app, label: "1Password"),
+                    .init(id: 3, kind: .site, label: "figma.com", mode: .titles)]
+    s.titlesOnScreen = .calls
     s.storageText = "4.2 MB since 9 Nov"
     s.builtins = BuiltinRules.all.map { BuiltinRuleRow(kind: $0.kind, label: $0.label, category: $0.category) }
     for (name, section, height) in [("settings-categories-unsorted", SettingsSection.categories, 1000.0),
-                                    ("settings-privacy", .privacy, 716)] {
+                                    ("settings-privacy", .privacy, 900)] {
         s.section = section
         let host = NSHostingView(rootView: SettingsView(viewModel: s).frame(width: 1200, height: height))
         let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: height), styleMask: [.borderless], backing: .buffered, defer: false)

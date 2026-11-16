@@ -68,21 +68,26 @@ public final class SettingsViewModel: ObservableObject {
         public var id: Int64
         public var kind: Rule.Kind
         public var label: String
-        public init(id: Int64, kind: Rule.Kind, label: String) {
+        public var mode: ExclusionMode
+        public init(id: Int64, kind: Rule.Kind, label: String, mode: ExclusionMode = .skip) {
             self.id = id
             self.kind = kind
             self.label = label
+            self.mode = mode
         }
     }
     @Published public var skipPrivate = true
+    /// Both lists: Don't track (`.skip`) and Never save titles for (`.titles`).
     @Published public var exclusions: [Exclusion] = []
+    @Published public var titlesOnScreen = TitlesOnScreen.never
+    public var onSetTitlesOnScreen: ((TitlesOnScreen) -> Void)?
     /// nil = forever
     @Published public var retentionDays: Int?
     public var retentionChoices: [Int?] = [nil, 365, 90]
     /// "4.2 MB since 9 Nov"
     @Published public var storageText = ""
     public var onSetSkipPrivate: ((Bool) -> Void)?
-    public var onAddExclusion: ((Rule.Kind, String) -> Void)?
+    public var onAddExclusion: ((Rule.Kind, String, ExclusionMode) -> Void)?
     public var onDeleteExclusion: ((Int64) -> Void)?
     public var onSetRetention: ((Int?) -> Void)?
     public var onShowInFinder: (() -> Void)?
@@ -343,7 +348,7 @@ private struct CategoriesPage: View {
             Text(Durations.format(u.total)).font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)
                 .lineLimit(1).fixedSize()
             CategoryPicker(categories: vm.userCategories, selected: nil, onNew: { newCategory = "" },
-                           onNeverTrack: { vm.onAddExclusion?(u.kind, u.pattern) }) {
+                           onNeverTrack: { vm.onAddExclusion?(u.kind, u.pattern, .skip) }) {
                 vm.onSort?(u, $0.id)
             }
             .frame(width: 200)
@@ -360,7 +365,7 @@ private struct CategoriesPage: View {
     private var neverTrackSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text(vm.exclusions.isEmpty ? "NEVER TRACK" : "NEVER TRACK · \(vm.exclusions.count)").eyebrow()
+                Text(vm.exclusions.allSatisfy { $0.mode != .skip } ? "NEVER TRACK" : "NEVER TRACK · \(vm.exclusions.filter { $0.mode == .skip }.count)").eyebrow()
                 Spacer()
                 Text("Time in these is not recorded.").font(.system(size: 12)).foregroundStyle(Theme.textFaint)
             }

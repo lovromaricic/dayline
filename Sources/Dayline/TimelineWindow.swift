@@ -240,8 +240,9 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         segments = (try? engine.store.segments(from: dayStart, to: next)) ?? []
         let categorizer = engine.categorizer
         if viewModel.categories != categorizer.categoryList { viewModel.categories = categorizer.categoryList }
-        viewModel.update(DayReport(segments: segments, dayStart: dayStart, now: TrackingEngine.now(),
-                                   resolve: { categorizer.resolve($0) }))
+        let report = DayReport(segments: segments, dayStart: dayStart, now: TrackingEngine.now(),
+                               resolve: { categorizer.resolve($0) })
+        viewModel.update(engine.hidesTitlesNow ? report.hidingTitles() : report)
         let week = viewModel.period == .week ? loadWeek() : nil
         if viewModel.week != week { viewModel.week = week }
         // A week of reports: at most once a minute, or right away after show().
@@ -273,7 +274,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         let reports = starts.filter { $0 <= today }.map { day in
             let next = Self.startOfDay(cal.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: TimeInterval(day)))!)
             let segs = (try? engine.store.segments(from: day, to: next)) ?? []
-            return DayReport(segments: segs, dayStart: day, now: now, resolve: { categorizer.resolve($0) })
+            let report = DayReport(segments: segs, dayStart: day, now: now, resolve: { categorizer.resolve($0) })
+            return engine.hidesTitlesNow ? report.hidingTitles() : report
         }
         return WeekReport(weekStart: starts[0], reports: reports, dayStarts: starts, today: today)
     }
