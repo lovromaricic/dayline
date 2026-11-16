@@ -1,6 +1,6 @@
 # Dayline
 
-An automatic time tracker for macOS. Dayline sits in the menu bar and records which app you are in and, for Google Chrome, which tab and site. There are no timers to start and nothing to type. Time you are away (idle, asleep, locked) is shown as a gap, not guessed.
+An automatic time tracker for macOS. Dayline sits in the menu bar and records which app you are in and, for Chrome and Safari, which tab and site. There are no timers to start and nothing to type. Time you are away (idle, asleep, locked) is shown as a gap, not guessed.
 
 Everything stays on your Mac in one SQLite file. Dayline has no account and makes no network requests.
 
@@ -17,10 +17,10 @@ Everything stays on your Mac in one SQLite file. Dayline has no account and make
 | Sees | Never sees |
 |---|---|
 | Which app you are in | Screenshots or screen contents |
-| Window and Chrome tab titles, and the site (host and domain, never the path) | Keystrokes or clipboard |
+| Window and browser tab titles (Chrome, Safari), and the site (host and domain, never the path) | Keystrokes or clipboard |
 | When you are active or away, and whether a mic or camera is in use | Page contents |
 
-Chrome Incognito windows are skipped by default, and any app or site can be excluded in Settings.
+Chrome Incognito and Safari Private windows are skipped by default, and any app or site can be excluded in Settings.
 
 ## Requirements
 
@@ -53,7 +53,7 @@ Dayline is not notarized. If you download a build instead of building it, macOS 
 - **Timeline** (Open timeline in the popover, or right-click the menu bar item): a one-line summary of the day, lanes per category, the blocks list and an inspector. Select a block to change its category; Dayline offers to remember it as a rule. Drag a bar to another lane for the same thing. ←/→ moves between days, ↑/↓ through blocks, ⌘F searches. Every number adds up: blocks to their category, categories to the day's total.
 - **Week:** the Day/Week switch shows each day of the week split by category, with the week's total and average.
 - **Calls:** while a mic or camera is in use you stay tracked even without typing, and apps with no category of their own count as Meetings.
-- **Settings** (⌘,): start at login, the away threshold, calls, Chrome titles, an optional end-of-day recap notification, categories and rules (with a list of apps and sites that still need a category), never-track list, history length, export (CSV, JSON) and delete all.
+- **Settings** (⌘,): start at login, the away threshold, calls, browser tab titles, an optional end-of-day recap notification, categories and rules (with a list of apps and sites that still need a category), never-track list, history length, export (CSV, JSON) and delete all.
 
 ## Data
 
@@ -76,7 +76,7 @@ Always launch the app bundle (the scripts use `open`). Running the bare executab
 | Module | Role |
 |---|---|
 | `Domain` | Models, segmenter, blocks and day summaries. No AppKit, fully unit-tested. |
-| `Capture` | Frontmost app, Accessibility titles, Chrome URL and Incognito, idle, sleep/lock, mic/camera. |
+| `Capture` | Frontmost app, Accessibility titles, Chrome and Safari URL and private windows, idle, sleep/lock, mic/camera. |
 | `Categorize` | Rule resolution and the built-in rules. |
 | `Store` | SQLite through GRDB. |
 | `UI` | SwiftUI views for the popover, timeline and Settings. |
