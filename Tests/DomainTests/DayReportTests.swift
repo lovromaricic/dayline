@@ -8,18 +8,21 @@ import Testing
 
     var nextID: Int64 = 0
     mutating func seg(_ s: Int64, _ e: Int64, _ app: String = "xcode", domain: String? = nil, title: String? = nil,
-                      _ kind: SegmentKind = .active) -> Segment {
+                      _ kind: SegmentKind = .active, call: Bool = false) -> Segment {
         nextID += 1
-        return Segment(id: nextID, start: s, end: e, kind: kind, appBundleID: app, appName: app, title: title, domain: domain)
+        return Segment(id: nextID, start: s, end: e, kind: kind, appBundleID: app, appName: app, title: title, domain: domain,
+                       call: call)
     }
 
     func cat(_ s: Segment) -> ActivityCategory {
-        switch s.appBundleID {
+        let base: ActivityCategory = switch s.appBundleID {
         case "xcode", "terminal": .development
         case "slack": .communication
         case "zoom": .meetings
         default: s.domain == "github.com" ? .development : .browsing
         }
+        // A whole call is Meetings; split, only browsing where it took place is (as in Categorizer).
+        return s.wholeCall || (s.call && base == .browsing) ? .meetings : base
     }
 
     func report(_ segs: [Segment], now: Int64? = nil) -> DayReport {
@@ -216,5 +219,41 @@ extension DayReportTests {
 
         let many = report([seg(at(9), at(9, 30), "zoom"), seg(at(11), at(11, 30), "zoom"), seg(at(14), at(14, 30), "zoom")])
         #expect(many.headline(calendar: utc).1 == "with long calls all day.")
+    }
+}
+
+extension DayReportTests {
+    @Test mutating func aWholeCallIsOneMeetingsBlockWithItsProof() {
+        let huddle = "Alex - Acme - Slack"
+        let r = report([
+            seg(at(14), at(14, 23)),                                                   // coding, no call
+            seg(at(14, 23), at(14, 27), "chrome", title: huddle, call: true),          // the huddle window
+            seg(at(14, 27), at(14, 50), "figma", title: "Onboarding – Figma", call: true),
+            seg(at(14, 50), at(14, 50, 30), "chrome", domain: "amazon.de", call: true), // a glance
+            seg(at(14, 50, 30), at(15, 13), "figma", title: "Onboarding – Figma", call: true),
+            seg(at(15, 13), at(15, 16), "chrome", title: huddle, call: true),
+            seg(at(15, 16), at(15, 30)),
+        ])
+        #expect(r.calls.count == 1 && r.calls[0].name == "Slack huddle")
+        let call = r.blocks.filter { $0.call != nil }
+        #expect(call.count == 1)
+        #expect(call[0].start == at(14, 23) && call[0].end == at(15, 16))
+        #expect(call[0].category == .meetings && call[0].duration == 53 * 60)
+        #expect(call[0].title == "Slack huddle with Alex")
+        // The proof: what was in front, adding up to the block.
+        #expect(call[0].call?.totals.map(\.label) == ["Onboarding", "Slack huddle"])   // the 30 s glance is under a minute
+        #expect(call[0].call?.totals.first?.source == "figma")
+        #expect(call[0].call?.parts.map(\.label) == ["Slack huddle", "Onboarding", "amazon.de", "Onboarding", "Slack huddle"])
+        #expect(call[0].call?.totals.reduce(0) { $0 + $1.duration } == call[0].duration)
+        #expect(call[0].call?.parts.first?.label == "Slack huddle")
+        #expect(r.lanes.map(\.category) == [.meetings, .development])  // Figma's time is the call's
+        #expect(r.lanes.reduce(0) { $0 + $1.total } == r.tracked)
+        #expect(r.tracked == 90 * 60)
+    }
+
+    @Test mutating func aShortMicRunIsNotACall() {
+        let r = report([seg(at(9), at(9, 10)), seg(at(9, 10), at(9, 11, 30), call: true), seg(at(9, 11, 30), at(9, 20))])
+        #expect(r.calls.isEmpty)
+        #expect(r.blocks.count == 1 && r.blocks[0].call == nil)
     }
 }

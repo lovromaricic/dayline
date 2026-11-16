@@ -94,6 +94,27 @@ public final class HomeViewModel: ObservableObject {
     public var onSetCategory: ((Block, ActivityCategory) -> Void)?
     /// "Always": turn the correction into a rule.
     public var onAlways: ((Correction) -> Void)?
+    /// "What I was doing": a whole call goes back to what was in front.
+    public var onSplitCall: ((Block) -> Void)?
+    /// A split call counts as one Meetings block again.
+    public var onWholeCall: ((DayReport.Call) -> Void)?
+
+    public func splitCall(_ block: Block) {
+        selection = block.id
+        pendingCorrection = nil
+        onSplitCall?(block)
+    }
+
+    public func wholeCall(_ call: DayReport.Call) {
+        pendingCorrection = nil
+        onWholeCall?(call)
+    }
+
+    /// The split call a block was part of, for "Count the whole call as Meetings".
+    public func splitCall(containing b: Block) -> DayReport.Call? {
+        guard b.call == nil, let first = b.segmentIDs.first else { return nil }
+        return report.calls.first { $0.split && $0.segmentIDs.contains(first) }
+    }
 
     /// The inspector select or a drag to another lane.
     public func setCategory(_ block: Block, _ category: ActivityCategory) {
@@ -101,7 +122,8 @@ public final class HomeViewModel: ObservableObject {
         // Set before the reload, so update() can follow the block if it merges.
         selection = block.id
         // Picking Dayline's own guess again is an undo, not a correction.
-        pendingCorrection = category == block.guess ? nil : Correction.subject(for: block, category: category)
+        // A call is not an app or site to make a rule for.
+        pendingCorrection = category == block.guess || block.call != nil ? nil : Correction.subject(for: block, category: category)
         onSetCategory?(block, category)
     }
 

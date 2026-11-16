@@ -73,10 +73,6 @@ public struct Segmenter: Sendable {
     private var lastInput: Int64 = 0
     private var awaySince: Int64?
     private var rawCall = false
-    /// Where the call started: the app (and site) in front when the mic or
-    /// camera came on. Only time there is "in the call"; a Slack tab during a
-    /// Teams call is chat. nil when nothing was in front: every app counts.
-    private var callPlace: Activity?
     private var callOffSince: Int64?
     private var callEndedAt: Int64?
 
@@ -124,8 +120,6 @@ public struct Segmenter: Sendable {
             }
         case .call(let on):
             if on {
-                // A new call, not the same one coming back within the grace period.
-                if !inCall, case .visible(let a) = foreground { callPlace = a } else if !inCall { callPlace = nil }
                 // Starting a call means you are here; the mic repeating "on"
                 // mid-call does not undo an untouched call going away.
                 if !inCall { awaySince = nil }
@@ -155,15 +149,6 @@ public struct Segmenter: Sendable {
 
     // MARK: - Private
 
-    /// Same app, and for a browser the same host: meet.google.com is the
-    /// call, calendar.google.com is not.
-    private func isCallPlace(_ a: Activity) -> Bool {
-        guard let p = callPlace else { return true }
-        if Titles.isCallWindow(appBundleID: a.appBundleID, host: a.host, title: a.title) { return true }
-        func site(_ x: Activity) -> String? { x.host ?? x.title.flatMap(Titles.webAppHost) }
-        return a.appBundleID == p.appBundleID && site(a) == site(p)
-    }
-
     private var isHidden: Bool {
         if case .hidden = foreground { return true }
         return false
@@ -187,7 +172,9 @@ public struct Segmenter: Sendable {
         if !suspended.isEmpty { return (.away, nil, false) }
         if isHidden { return nil }
         if awaySince != nil { return (.away, nil, false) }
-        if case .visible(let a) = foreground { return (.active, a, inCall && isCallPlace(a)) }
+        // Every segment during a call is flagged, so the call's whole span is
+        // known; `narrowingCalls` finds where it took place.
+        if case .visible(let a) = foreground { return (.active, a, inCall) }
         return nil
     }
 
@@ -215,10 +202,11 @@ public struct Segmenter: Sendable {
 }
 
 extension Segment {
-    /// Data recorded before the call place existed flags every segment during
-    /// a call. Narrow it the same way the Segmenter does now: a run of call
-    /// segments belongs to where its first one was, and only time there is
-    /// the call. Newer data already looks like this, so it comes out unchanged.
+    /// Every segment during a call is flagged. Narrow the flag to where the
+    /// call took place: a run of call segments belongs to where its first one
+    /// was (same app, and for a browser the same site: meet.google.com is the
+    /// call, calendar.google.com is not), plus call windows such as a Slack
+    /// huddle. Already narrow data comes out unchanged.
     public static func narrowingCalls(_ segments: [Segment]) -> [Segment] {
         func place(_ s: Segment) -> String { s.appBundleID + "|" + (s.host ?? s.title.flatMap(Titles.webAppHost) ?? "") }
         var out = segments

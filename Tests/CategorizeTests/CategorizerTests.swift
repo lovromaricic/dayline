@@ -113,3 +113,20 @@ extension CategorizerTests {
         #expect(c.resolve(game).category == .entertainment)
     }
 }
+
+extension CategorizerTests {
+    @Test func aWholeCallIsMeetingsUnlessYouSaidOtherwise() {
+        var figma = app("com.figma.Desktop", call: true)
+        figma.wholeCall = true
+        var c = Categorizer(rules: [rule(.app, "com.figma.Desktop", .writing)])
+        #expect(c.resolve(figma).category == .meetings && c.resolve(figma).wholeCall)   // beats your rules
+        figma.manualCategoryID = ActivityCategory.design.id
+        #expect(c.resolve(figma).category == .design && !c.resolve(figma).wholeCall)   // your correction beats the call
+        figma.manualCategoryID = nil
+        c.wholeCallsSince = 1                                  // recorded before whole calls
+        #expect(c.resolve(figma).category == .writing)
+        c.wholeCallsSince = 0
+        c.callsAreMeetings = false
+        #expect(c.resolve(figma).category == .writing)
+    }
+}

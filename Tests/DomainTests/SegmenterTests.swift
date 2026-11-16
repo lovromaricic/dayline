@@ -126,7 +126,7 @@ private let xcode = Activity(appBundleID: "com.apple.dt.Xcode", appName: "Xcode"
         #expect(r.total(.away) == 0)
     }
 
-    @Test func callBelongsToTheTabItStartedIn() {
+    @Test func everySegmentDuringACallIsFlagged() {
         var r = Recorder()
         r.send(.startTracking, at: 0)
         let teams = chrome("Chat | Microsoft Teams", "https://teams.microsoft.com/v2/")
@@ -137,8 +137,15 @@ private let xcode = Activity(appBundleID: "com.apple.dt.Xcode", appName: "Xcode"
         r.send(.activity(teams), at: 120)
         r.send(.call(false), at: 300)
         r.send(.tick, at: 400)
-        // Teams is the call; Slack and the calendar during it are not.
-        #expect(r.rows.map(\.call) == [false, true, false, false, true, false])
+        // The whole span is the call; narrowing finds where it took place:
+        // Teams is the call, Slack and the calendar during it are not.
+        #expect(r.rows.map(\.call) == [false, true, true, true, true, false])
+        let segs = r.rows.enumerated().map { i, row in
+            Segment(id: Int64(i), start: row.start, end: row.end, kind: row.kind, appBundleID: "com.google.Chrome",
+                    appName: "Google Chrome", title: row.title, host: [0, 4].contains(i) ? "teams.microsoft.com"
+                        : i == 1 ? "teams.microsoft.com" : i == 2 ? "app.slack.com" : "calendar.google.com", call: row.call)
+        }
+        #expect(Segment.narrowingCalls(segs).map(\.call) == [false, true, false, false, true, false])
     }
 
     @Test func oldCallFlagsNarrowToWhereTheCallStarted() {

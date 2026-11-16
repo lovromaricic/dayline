@@ -175,7 +175,50 @@ weekVM.week = WeekReport(weekStart: weekStarts[0], reports: weekReports, dayStar
 let unsortedVM = HomeViewModel(report: homeReport)
 unsortedVM.unsortedCount = 3
 unsortedVM.unsortedTotal = 3 * 3600 + 27 * 60
+// A Slack huddle while designing in Figma: one Meetings block with its proof.
+func callSeg(_ s: Int64, _ e: Int64, _ title: String?, host: String?) -> Segment {
+    var x = hseg(s, e, "Google Chrome", title, host: host)
+    x.appBundleID = "com.google.Chrome"
+    x.call = true
+    return x
+}
+let huddle = "Alex - Acme - Slack"
+let callDay = Array(homeDay.prefix(4)) + [
+    hseg(at(11, 20), at(12, 0), "Zoom", "Standup"),
+    hseg(at(12, 0), at(12, 50), "", nil, .away),
+    hseg(at(12, 50), at(14, 23), "Xcode", "CaptureService.swift — Dayline"),
+    callSeg(at(14, 23), at(14, 27), huddle, host: nil),
+    callSeg(at(14, 27), at(14, 50), "Onboarding – Figma", host: "www.figma.com"),
+    callSeg(at(14, 50), at(14, 54), "Amazon.de", host: "www.amazon.de"),
+    callSeg(at(14, 54), at(15, 13), "Onboarding – Figma", host: "www.figma.com"),
+    callSeg(at(15, 13), at(15, 16), huddle, host: nil),
+    hseg(at(15, 16), at(16, 10), "Xcode", "CaptureService.swift — Dayline"),
+].map { s -> Segment in
+    var s = s
+    if s.host != nil { s.domain = PublicSuffix.shared.registrableDomain(of: s.host!) }
+    return s
+}
+let callCategorizer = Categorizer()
+func callResolve(_ s: Segment) -> CategoryResolution {
+    if s.appBundleID == "com.google.Chrome" || s.wholeCall { return callCategorizer.resolve(s) }
+    let c = homeCategory(s)
+    return CategoryResolution(category: c, guess: c, edited: false)
+}
+let callReport = DayReport(segments: callDay, dayStart: dayStart, now: now, resolve: callResolve)
+let callVM = HomeViewModel(report: callReport)
+callVM.selection = callReport.blocks.first { $0.call != nil }?.id
+// The same call split into what you were doing: its segments pinned.
+let splitDay = callDay.map { s -> Segment in
+    var s = s
+    if s.call { s.manualCategoryID = callCategorizer.resolve(Segment.narrowingCalls([s])[0], ignoringManual: true).category.id }
+    return s
+}
+let splitReport = DayReport(segments: splitDay, dayStart: dayStart, now: now, resolve: callResolve)
+let splitVM = HomeViewModel(report: splitReport)
+splitVM.selection = splitReport.blocks.first { $0.host == "www.figma.com" }?.id
 let homes: [(String, HomeViewModel)] = [
+    ("home-11-call", callVM),
+    ("home-12-call-split", splitVM),
     ("home-10-unsorted", unsortedVM),
     ("home-09-week", weekVM),
     ("home-08-filtered", filteredVM),

@@ -31,15 +31,23 @@ struct Inspector: View {
                     .padding(.top, 6)
                 Text(Fmt.longDuration(b.duration)).font(.system(size: 13)).foregroundStyle(Theme.textMuted)
             }
-            VStack(alignment: .leading, spacing: 16) {
-                field("App", b.appName)
-                // "App: Claude, Window title: Claude" says nothing twice.
-                if let title = b.title, title != b.appName {
-                    field(b.host == nil ? "Window title" : "Tab title", title)
+            if let call = b.call {
+                VStack(alignment: .leading, spacing: 16) {
+                    field("Call", call.name)
+                    proof(call)
                 }
-                if let host = b.host { field("Site", host) }
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    field("App", b.appName)
+                    // "App: Claude, Window title: Claude" says nothing twice.
+                    if let title = b.title, title != b.appName {
+                        field(b.host == nil ? "Window title" : "Tab title", title)
+                    }
+                    if let host = b.host { field("Site", host) }
+                }
             }
             categorySelect(b)
+            if let call = vm.splitCall(containing: b) { wholeCall(call) }
             if let c = vm.pendingCorrection, c.blockID == b.id {
                 prompt(c)
             }
@@ -53,6 +61,10 @@ struct Inspector: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Category").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
             Menu {
+                if b.call != nil {
+                    Button("What I was doing") { vm.splitCall(b) }
+                    Divider()
+                }
                 ForEach(vm.categories) { c in
                     Button {
                         vm.setCategory(b, c)
@@ -80,6 +92,57 @@ struct Inspector: View {
             if b.edited {
                 Text("Changed from \(b.guess.name)").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
             }
+        }
+    }
+
+    /// "While on the call": what was in front, by app or site.
+    private func proof(_ call: CallDetail) -> some View {
+        let total = CGFloat(max(1, call.totals.reduce(0) { $0 + $1.duration }))
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("While on the call").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            GeometryReader { geo in
+                HStack(spacing: 1) {
+                    ForEach(Array(call.totals.enumerated()), id: \.offset) { _, p in
+                        Rectangle().fill(Color(hexString: p.category.color))
+                            .frame(width: max(1, (geo.size.width - CGFloat(call.totals.count - 1)) * CGFloat(p.duration) / total))
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 2))
+            }
+            .frame(height: 4)
+            .accessibilityHidden(true)
+            ForEach(Array(call.totals.enumerated()), id: \.offset) { _, p in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Circle().fill(Color(hexString: p.category.color)).frame(width: 8, height: 8)
+                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(p.label).font(.system(size: 14)).lineLimit(1).truncationMode(.tail)
+                        if let source = p.source {
+                            Text(source).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    Text(Durations.format(p.duration)).font(.system(size: 14)).monospacedDigit().foregroundStyle(Theme.textMuted)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    /// A block from a call you split: one click puts the whole call back.
+    private func wholeCall(_ call: DayReport.Call) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("On a call: \(call.title), \(Fmt.range(call.start, call.end))")
+                .font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { vm.wholeCall(call) } label: {
+                Text("Count the whole call as Meetings").font(.system(size: 13))
+                    .frame(maxWidth: .infinity, minHeight: 34)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Theme.surfaceControl))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 

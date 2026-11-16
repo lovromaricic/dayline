@@ -162,6 +162,8 @@ struct TimelineChart: View {
         let selected = vm.selection == b.id
         return RoundedRectangle(cornerRadius: 5)
             .fill(Color(hexString: b.category.color))
+            .overlay(alignment: .bottom) { if let call = b.call { proof(call, in: b) } }
+            .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.text, lineWidth: selected ? 1.5 : 0))
             .frame(width: max(3, x(b.end, width) - x(b.start, width) - 3), height: 22)
             .matchedGeometryEffect(id: b.id, in: barSpace)
@@ -174,7 +176,31 @@ struct TimelineChart: View {
                     if let to = dropTarget, let c = rows[to].category { vm.setCategory(b, c) }
                     drag = nil
                 })
-            .help("\(b.title ?? b.appName) · \(Fmt.range(b.start, b.end, open: b.isOpen))")
+            .help(help(b))
+    }
+
+    private func help(_ b: Block) -> String {
+        let base = "\(b.title ?? b.appName) · \(Fmt.range(b.start, b.end, open: b.isOpen))"
+        guard let call = b.call else { return base }
+        return base + "\nWhile on it: " + call.totals.map { "\($0.label) \(Durations.format($0.duration))" }.joined(separator: ", ")
+    }
+
+    /// A call's proof: a strip along the bottom of its bar, in the colors of
+    /// what was in front. The call window itself is a darker shade of the bar.
+    private func proof(_ call: CallDetail, in b: Block) -> some View {
+        GeometryReader { geo in
+            let span = CGFloat(max(1, b.end - b.start))
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(call.parts.enumerated()), id: \.offset) { _, p in
+                    Rectangle()
+                        .fill(p.category == b.category ? Color.black.opacity(0.22) : Color(hexString: p.category.color))
+                        .frame(width: max(1, geo.size.width * CGFloat(p.end - p.start) / span))
+                        .offset(x: geo.size.width * CGFloat(p.start - b.start) / span)
+                }
+            }
+        }
+        .frame(height: 5)
+        .accessibilityHidden(true)
     }
 
     private var emptyLane: some View {

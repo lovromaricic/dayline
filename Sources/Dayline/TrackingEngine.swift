@@ -32,6 +32,13 @@ final class TrackingEngine {
         reloadCategories()
         segmenter.config.idleThreshold = Int64(idleMinutes * 60)
         categorizer.callsAreMeetings = callsActive
+        // Calls recorded before this version flag only the call window.
+        if let since = (try? database.setting("calls.whole.since")).flatMap({ $0 }).flatMap(Int64.init) {
+            categorizer.wholeCallsSince = since
+        } else {
+            categorizer.wholeCallsSince = Self.now()
+            try? database.setSetting("calls.whole.since", String(categorizer.wholeCallsSince))
+        }
         watcher.readChromeTitles = readChromeTitles
         watcher.skipPrivateWindows = skipPrivateWindows
     }

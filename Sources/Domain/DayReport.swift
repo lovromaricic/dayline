@@ -23,6 +23,66 @@ public struct Block: Equatable, Identifiable, Sendable {
     public var segmentIDs: [Int64]
     /// The block is still growing (today, open segment).
     public var isOpen = false
+    /// Set when the block is a whole call: what was in front during it.
+    public var call: CallDetail?
+}
+
+/// A call that counts as one Meetings block, and the proof of what you did on it.
+public struct CallDetail: Equatable, Sendable {
+    /// "Slack huddle with Alex", "Google Meet", "Zoom call"…
+    public var name: String
+    /// What was in front, in time order: the strip inside the call's bar.
+    public var parts: [Part] = []
+    /// The same by app or site, largest first, in whole minutes adding up to the block.
+    public var totals: [Part] = []
+
+    public struct Part: Equatable, Sendable {
+        public var start: Int64
+        public var end: Int64
+        /// Active seconds; whole minutes in `totals`.
+        public var duration: Int64
+        /// The window or tab title ("Novi kreditni accounti"), else the site or
+        /// app; the call's own name for the call window.
+        public var label: String
+        /// Where the title is from ("figma.com", "Figma"); nil when the label says it.
+        public var source: String?
+        /// What it is outside the call: Figma stays Design here.
+        public var category: ActivityCategory
+
+        init(start: Int64, end: Int64, duration: Int64, label: String, source: String? = nil, category: ActivityCategory) {
+            self.start = start
+            self.end = end
+            self.duration = duration
+            self.label = label
+            self.source = source
+            self.category = category
+        }
+    }
+
+    mutating func add(_ p: Part) {
+        if let last = parts.last, last.label == p.label, last.category == p.category, p.start - last.end < DayReport.mergeGap {
+            parts[parts.count - 1].end = p.end
+            parts[parts.count - 1].duration += p.duration
+        } else {
+            parts.append(p)
+        }
+    }
+
+    /// `totals` from `parts`, rounded so they add up to the block's minutes.
+    mutating func total(to minutes: Int64) {
+        var keys: [String] = []
+        var sums: [String: Part] = [:]
+        for p in parts {
+            let key = "\(p.label)|\(p.category.id)"
+            if sums[key] == nil { keys.append(key); sums[key] = p } else { sums[key]!.duration += p.duration }
+        }
+        var list = keys.map { sums[$0]! }
+        for (i, m) in DayReport.wholeMinutes(list.map(\.duration)).enumerated() { list[i].duration = m }
+        list.sort { $0.duration > $1.duration }
+        // Gaps under a minute are bridged in the block but not here; settle the difference on the largest.
+        if !list.isEmpty { list[0].duration = max(0, list[0].duration + minutes - list.reduce(0) { $0 + $1.duration }) }
+        totals = list.filter { $0.duration > 0 }
+    }
 }
 
 /// Everything the main window shows about one day.
@@ -69,6 +129,23 @@ public struct DayReport: Equatable, Sendable {
     /// Calls of 25 minutes or more, oldest first, for the headline.
     public var longCalls: [Focus] = []
     public var axis: ClosedRange<Int64>
+    /// Calls of 2 minutes or more, oldest first, whether they count as a
+    /// whole (one Meetings block) or were split into what you were doing.
+    public var calls: [Call] = []
+
+    public struct Call: Equatable, Sendable {
+        public var start: Int64
+        public var end: Int64
+        /// "Slack huddle", "Google Meet"…
+        public var name: String
+        /// Who was on it, where the window says: "Alex, Sam".
+        public var people: String?
+        public var segmentIDs: [Int64]
+        /// "Slack huddle with Alex, Sam".
+        public var title: String { people.map { "\(name) with \($0)" } ?? name }
+        /// You split it into what you were doing ("What I was doing").
+        public var split = false
+    }
     /// What you are in right now, from the raw segments: blocks need a
     /// minute and may absorb a short visit into a neighbour, so they cannot
     /// say what is in front during the first minute in an app.
@@ -76,13 +153,16 @@ public struct DayReport: Equatable, Sendable {
 
     static let mergeGap: Int64 = 60
     static let minBlock: Int64 = 60
+    /// A shorter mic run (dictation, a quick voice note) is not a call.
+    static let minCall: Int64 = 120
     /// "Stretches of 25 minutes or more in one app" (screen 05).
     public static let focusMinimum: Int64 = 25 * 60
 
     public init(segments: [Segment], dayStart: Int64, now: Int64, category: (Segment) -> ActivityCategory) {
         self.init(segments: segments, dayStart: dayStart, now: now) {
             let c = category($0)
-            return CategoryResolution(category: c, guess: c, edited: false)
+            return CategoryResolution(category: c, guess: c, edited: false,
+                                      wholeCall: $0.wholeCall && c.id == ActivityCategory.meetings.id)
         }
     }
 
@@ -93,12 +173,19 @@ public struct DayReport: Equatable, Sendable {
         isToday = now >= dayStart && now < dayEnd
         axis = DayReport.axis(dayStart: dayStart, segments: segments, now: isToday ? now : nil)
 
-        let clipped = Segment.narrowingCalls(segments).compactMap { s -> Segment? in
+        var raw = segments.compactMap { s -> Segment? in
             var s = s
             s.start = max(s.start, dayStart)
             s.end = min(s.end, dayEnd)
             return s.end > s.start ? s : nil
         }
+        // Calls from the raw flags, which cover every segment while the mic
+        // was on; then the flags narrow to where each call took place.
+        calls = DayReport.calls(in: raw)
+        let inCall = Set(calls.flatMap(\.segmentIDs))
+        for i in raw.indices where inCall.contains(raw[i].id) { raw[i].wholeCall = true }
+        let clipped = Segment.narrowingCalls(raw)
+        let callNames = Dictionary(calls.flatMap { c in c.segmentIDs.map { ($0, c) } }, uniquingKeysWith: { a, _ in a })
         for s in clipped {
             switch s.kind {
             case .away:
@@ -119,10 +206,18 @@ public struct DayReport: Equatable, Sendable {
         }
         var cache: [Int64: CategoryResolution] = [:]
         for s in clipped where s.kind == .active { cache[s.id] = resolve(s) }
+        let pinned = Set(clipped.filter { $0.wholeCall && $0.manualCategoryID != nil }.map(\.id))
+        for i in calls.indices { calls[i].split = calls[i].segmentIDs.contains(where: pinned.contains) }
         let category: (Segment) -> ActivityCategory = { cache[$0.id]?.category ?? .uncategorized }
         away = DayReport.visibleBreaks(away)
         untracked = DayReport.visibleBreaks(untracked)
-        blocks = DayReport.blocks(from: clipped, resolution: { cache[$0.id]! })
+        blocks = DayReport.blocks(from: clipped, resolution: { cache[$0.id]! }, proof: { s in
+            // What the segment is outside the call.
+            var plain = s
+            plain.wholeCall = false
+            let call = callNames[s.id]
+            return (call?.name ?? "Call", call?.title ?? "Call", resolve(plain).category)
+        })
         // The open segment can still be zero seconds long (just resumed, just
         // switched), which clipping drops; it is still what is in front.
         if isToday, var open = segments.last, open.kind == .active, open.end >= dayStart, now - open.end <= 15 {
@@ -142,7 +237,10 @@ public struct DayReport: Equatable, Sendable {
         // Every number comes from the blocks, in whole minutes, so the blocks
         // add up to their row, the rows and the top apps to the total. Time
         // that never made a block (glances under a minute) is left out.
-        for (i, m) in DayReport.wholeMinutes(blocks.map(\.duration)).enumerated() { blocks[i].duration = m }
+        for (i, m) in DayReport.wholeMinutes(blocks.map(\.duration)).enumerated() {
+            blocks[i].duration = m
+            blocks[i].call?.total(to: m)
+        }
         var order: [ActivityCategory] = []
         var laneBlocks: [ActivityCategory: [Block]] = [:]
         var apps: [String] = []
@@ -190,7 +288,10 @@ public struct DayReport: Equatable, Sendable {
     /// Spec 3.1: merge same app + site + category with gaps < 60 s; blocks
     /// under a minute are absorbed into a touching block of the same category,
     /// otherwise dropped from the list (they still count in totals).
-    static func blocks(from segments: [Segment], resolution: (Segment) -> CategoryResolution) -> [Block] {
+    /// A whole call is one block, whatever app was in front; `proof` gives its
+    /// name and what each of its segments is outside the call.
+    static func blocks(from segments: [Segment], resolution: (Segment) -> CategoryResolution,
+                       proof: (Segment) -> (name: String, title: String, category: ActivityCategory) = { _ in ("Call", "Call", .meetings) }) -> [Block] {
         var runs: [Block] = []
         var longest: [Int64: Int64] = [:]  // block id -> longest segment duration
         var lastKind: SegmentKind?
@@ -199,21 +300,36 @@ public struct DayReport: Equatable, Sendable {
             guard s.kind == .active else { continue }
             let res = resolution(s)
             let c = res.category
-            if var last = runs.last, lastKind == .active, last.appBundleID == s.appBundleID, last.domain == s.domain,
-               last.category == c, s.start - last.end < mergeGap {
+            let call = res.wholeCall ? proof(s) : nil
+            let part = call.map { call -> CallDetail.Part in
+                let place = s.domain ?? s.appName
+                let title = s.title.map(Titles.withoutAppSuffix).flatMap { $0.isEmpty ? nil : $0 }
+                return call.category == c
+                    ? CallDetail.Part(start: s.start, end: s.end, duration: s.duration, label: call.name, category: call.category)
+                    : CallDetail.Part(start: s.start, end: s.end, duration: s.duration, label: title ?? place,
+                                      source: title == nil ? nil : place, category: call.category)
+            }
+            if var last = runs.last, lastKind == .active, last.category == c, s.start - last.end < mergeGap,
+               (last.call != nil) == (part != nil),
+               part != nil || (last.appBundleID == s.appBundleID && last.domain == s.domain) {
                 last.end = max(last.end, s.end)
                 last.duration += s.duration
                 last.segmentIDs.append(s.id)
                 last.edited = last.edited || res.edited
-                if s.duration > longest[last.id, default: 0] {
+                if let part {
+                    last.call?.add(part)
+                } else if s.duration > longest[last.id, default: 0] {
                     longest[last.id] = s.duration
                     last.title = s.title
                 }
                 runs[runs.count - 1] = last
             } else {
-                runs.append(Block(id: s.id, start: s.start, end: s.end, duration: s.duration, appBundleID: s.appBundleID,
-                                  appName: s.appName, title: s.title, host: s.host, domain: s.domain, category: c,
-                                  guess: res.guess, edited: res.edited, segmentIDs: [s.id]))
+                var b = Block(id: s.id, start: s.start, end: s.end, duration: s.duration, appBundleID: s.appBundleID,
+                              appName: s.appName, title: call?.title ?? s.title, host: call == nil ? s.host : nil,
+                              domain: call == nil ? s.domain : nil, category: c, guess: res.guess, edited: res.edited,
+                              segmentIDs: [s.id])
+                if let call, let part { b.call = CallDetail(name: call.title, parts: [part]) }
+                runs.append(b)
                 longest[s.id] = s.duration
             }
         }
@@ -223,7 +339,9 @@ public struct DayReport: Equatable, Sendable {
         for i in runs.indices {
             let run = runs[i]  // may have absorbed a short run just before it
             if run.duration >= minBlock { kept.append(run); continue }
-            if var prev = kept.last, prev.category == run.category, run.start - prev.end < mergeGap {
+            // A call's bits stay with the call; nothing else joins it.
+            if run.call != nil { continue }
+            if var prev = kept.last, prev.call == nil, prev.category == run.category, run.start - prev.end < mergeGap {
                 prev.end = max(prev.end, run.end)
                 prev.duration += run.duration
                 prev.segmentIDs += run.segmentIDs
@@ -235,7 +353,8 @@ public struct DayReport: Equatable, Sendable {
                 var j = i + 1
                 while j < runs.count, runs[j].category != run.category, runs[j].duration < minBlock,
                       runs[j].start - run.end < mergeGap { j += 1 }
-                guard j < runs.count, runs[j].category == run.category, runs[j].start - run.end < mergeGap else { continue }
+                guard j < runs.count, runs[j].call == nil, runs[j].category == run.category,
+                      runs[j].start - run.end < mergeGap else { continue }
                 runs[j].start = run.start
                 runs[j].duration += run.duration
                 runs[j].segmentIDs = run.segmentIDs + runs[j].segmentIDs
@@ -246,8 +365,8 @@ public struct DayReport: Equatable, Sendable {
         // Dropping a short interruption leaves two halves of the same block; join them.
         var merged: [Block] = []
         for b in kept {
-            if var last = merged.last, last.appBundleID == b.appBundleID, last.domain == b.domain,
-               last.category == b.category, b.start - last.end < mergeGap {
+            if var last = merged.last, last.call == nil, b.call == nil, last.appBundleID == b.appBundleID,
+               last.domain == b.domain, last.category == b.category, b.start - last.end < mergeGap {
                 last.end = b.end
                 last.duration += b.duration
                 last.segmentIDs += b.segmentIDs
@@ -259,6 +378,28 @@ public struct DayReport: Equatable, Sendable {
             }
         }
         return merged
+    }
+
+    /// Runs of call-flagged segments (the raw flags, before narrowing) with
+    /// gaps under a minute, named after where the call took place.
+    static func calls(in segments: [Segment]) -> [Call] {
+        var runs: [[Segment]] = []
+        var open = false
+        for s in segments {
+            guard s.kind == .active, s.call else { open = false; continue }
+            if open, let last = runs.last?.last, s.start - last.end < mergeGap {
+                runs[runs.count - 1].append(s)
+            } else {
+                runs.append([s])
+            }
+            open = true
+        }
+        return runs.filter { $0.last!.end - $0.first!.start >= minCall }.map { run in
+            let names = run.map { Titles.callName(appBundleID: $0.appBundleID, appName: $0.appName, host: $0.host, title: $0.title) }
+            let people = run.lazy.compactMap { Titles.callPeople(host: $0.host, title: $0.title) }.first
+            return Call(start: run.first!.start, end: run.last!.end, name: names.first { !$0.hasPrefix("Call in ") } ?? names[0],
+                        people: people, segmentIDs: run.map(\.id))
+        }
     }
 
     static func longestFocus(_ blocks: [Block]) -> Focus? {

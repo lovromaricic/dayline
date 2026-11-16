@@ -2,17 +2,22 @@ import Domain
 
 /// Resolution order (spec section 4), first match wins:
 /// 1. a manual correction on the segment ("Just this time")
-/// 2. your rules, newest first within a kind; kinds in order site, app, title
-/// 3. built-in rules (BuiltinRules.swift)
-/// 4. the app's own LSApplicationCategoryType
-/// 5. a call counts as Meetings when that setting is on. The segment's call
+/// 2. a whole call counts as Meetings when that setting is on, whatever was
+///    in front; what was in front shows as the call's proof (DayReport)
+/// 3. your rules, newest first within a kind; kinds in order site, app, title
+/// 4. built-in rules (BuiltinRules.swift)
+/// 5. the app's own LSApplicationCategoryType
+/// 6. a call counts as Meetings when that setting is on. The segment's call
 ///    flag is set only in the app or tab where the call started (Segmenter),
 ///    and only chat, browsing or uncategorized time turns into Meetings:
-///    Figma stays Design even in older data where the flag covered everything
-/// 6. Uncategorized
+///    Figma stays Design. This is what a call split into "What I was doing" shows
+/// 7. Uncategorized
 public struct Categorizer: Sendable {
     /// Spec setting "Count calls as active".
     public var callsAreMeetings = true
+    /// Whole calls start here: older data flags only the call window, so its
+    /// calls would come out as slivers. Before this, step 2 is skipped.
+    public var wholeCallsSince: Int64 = 0
     public private(set) var rules: [Rule] = []
     /// Category rows by id, so renamed or recolored categories show as they are now.
     public private(set) var categories: [Int64: ActivityCategory] = [:]
@@ -50,21 +55,29 @@ public struct Categorizer: Sendable {
         if !ignoringManual, let id = s.manualCategoryID, let c = categories[id] {
             return CategoryResolution(category: c, guess: guess, edited: c != guess)
         }
+        if callsAreMeetings && s.wholeCall && s.start >= wholeCallsSince {
+            let m = current(.meetings)
+            return CategoryResolution(category: m, guess: m, edited: false, wholeCall: true)
+        }
         if let rule = rules.first(where: { $0.matches(s) }), let c = categories[rule.categoryID] {
             return CategoryResolution(category: c, guess: guess, edited: c != guess)
         }
         return CategoryResolution(category: guess, guess: guess, edited: false)
     }
 
-    /// Steps 3–6: what Dayline picks without any input from you.
+    /// Steps 4–7: what Dayline picks without any input from you.
     public func guess(_ s: Segment) -> ActivityCategory {
         var seed = BuiltinRules.category(for: s)
             ?? appCategoryType(s.appBundleID).flatMap(BuiltinRules.appStoreCategory) ?? .uncategorized
         if callsAreMeetings && s.call && [ActivityCategory.uncategorized, .communication, .browsing].contains(seed) {
             seed = .meetings
         }
-        // Built-ins point at seed rows; show them under their current name and
-        // color, or wherever that row was merged to.
+        return current(seed)
+    }
+
+    /// Built-ins point at seed rows; show them under their current name and
+    /// color, or wherever that row was merged to.
+    private func current(_ seed: ActivityCategory) -> ActivityCategory {
         var id = seed.id
         for _ in 0..<8 { guard let next = aliases[id] else { break }; id = next }
         return categories[id] ?? categories[ActivityCategory.uncategorized.id] ?? .uncategorized

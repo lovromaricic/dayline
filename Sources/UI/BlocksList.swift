@@ -121,6 +121,13 @@ private struct BlockRow: View {
     var selected: Bool
     var hideTopBorder: Bool
 
+    /// A call says what you were in during it: "While in figma.com, Xcode".
+    private var subtitle: String {
+        guard let call = block.call else { return block.appName }
+        let apps = call.totals.filter { $0.category != block.category }.map(\.label).prefix(2)
+        return apps.isEmpty ? "Call" : "While in " + apps.joined(separator: ", ")
+    }
+
     /// The selected row's details step up from muted, so the fill alone marks it.
     private var meta: Color { selected ? Theme.textSecondary : Theme.textMuted }
 
@@ -135,7 +142,7 @@ private struct BlockRow: View {
                     .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
                 VStack(alignment: .leading, spacing: 0) {
                     Text(block.title ?? block.appName).font(.system(size: 14)).lineLimit(1).truncationMode(.tail)
-                    Text(block.appName).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
+                    Text(subtitle).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

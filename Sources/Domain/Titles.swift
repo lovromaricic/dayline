@@ -38,6 +38,35 @@ public enum Titles {
         "Outlook": "outlook.office.com",
     ]
 
+    /// "Novi kreditni accounti – FigJam" -> "Novi kreditni accounti": the
+    /// app's name after an en dash (Figma, Google Docs) says nothing new.
+    public static func withoutAppSuffix(_ title: String) -> String {
+        let t = normalize(title)
+        guard let r = t.range(of: " – ", options: .backwards), t.distance(from: r.upperBound, to: t.endIndex) <= 20 else { return t }
+        return String(t[..<r.lowerBound])
+    }
+
+    /// What to call a call, from the window it started in.
+    public static func callName(appBundleID: String, appName: String, host: String?, title: String?) -> String {
+        let site = host ?? title.flatMap(webAppHost)
+        if appBundleID == "us.zoom.xos" || site == "zoom.us" || site?.hasSuffix(".zoom.us") == true { return "Zoom call" }
+        if appBundleID == "com.apple.FaceTime" { return "FaceTime call" }
+        if site == "meet.google.com" { return "Google Meet" }
+        if appBundleID.hasPrefix("com.microsoft.teams") || site == "teams.microsoft.com" { return "Teams call" }
+        if appBundleID == "com.tinyspeck.slackmacgap" || site == "app.slack.com" { return "Slack huddle" }
+        if appBundleID == "com.hnc.Discord" || site == "discord.com" { return "Discord call" }
+        return "Call in \(appName)"
+    }
+
+    /// Who is on a Slack huddle, from its window: "Alex, Sam - Acme - Slack"
+    /// -> "Alex, Sam". nil for any other window.
+    public static func callPeople(host: String?, title: String?) -> String? {
+        guard host == nil, let t = title.map(normalize), t.hasSuffix(" - Slack") else { return nil }
+        let parts = t.components(separatedBy: " - ")
+        guard parts.count >= 3, let first = parts.first?.trimmingCharacters(in: .whitespaces), !first.isEmpty else { return nil }
+        return first
+    }
+
     /// Windows that are a call wherever the call started: a Slack huddle (its
     /// own browser window with no address, titled with the people in it,
     /// "Alex, Sam - Acme - Slack"), Google Meet, Zoom, FaceTime.

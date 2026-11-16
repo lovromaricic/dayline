@@ -38,6 +38,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onSetPeriod = { [weak self] _ in self?.reload(); self?.viewModel.replay += 1 }
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
         viewModel.onAlways = { [weak self] correction in self?.always(correction) }
+        viewModel.onSplitCall = { [weak self] block in self?.splitCall(block) }
+        viewModel.onWholeCall = { [weak self] call in self?.wholeCall(call) }
         viewModel.onOpenSystemSettings = { engine.openSystemSettings() }
         viewModel.onResume = { engine.resume() }
         viewModel.idleChoices = TrackingEngine.idleChoices
@@ -98,6 +100,34 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
             try engine.store.setManualCategory(segmentIDs: block.segmentIDs, categoryID: unpinned ? nil : category.id)
         } catch {
             Log.line("correction failed: \(error)")
+        }
+        reload()
+        onRulesChanged?()
+    }
+
+    /// "What I was doing": pin each of the call's segments to what it is
+    /// outside the call, so the call shows as the apps you were in.
+    private func splitCall(_ block: Block) {
+        let ids = Set(block.segmentIDs)
+        var groups: [Int64: [Int64]] = [:]
+        for s in Segment.narrowingCalls(segments) where ids.contains(s.id) {
+            groups[engine.categorizer.resolve(s, ignoringManual: true).category.id, default: []].append(s.id)
+        }
+        do {
+            for (category, ids) in groups { try engine.store.setManualCategory(segmentIDs: ids, categoryID: category) }
+        } catch {
+            Log.line("split call failed: \(error)")
+        }
+        reload()
+        onRulesChanged?()
+    }
+
+    /// Back to one Meetings block: the call's pins are dropped.
+    private func wholeCall(_ call: DayReport.Call) {
+        do {
+            try engine.store.setManualCategory(segmentIDs: call.segmentIDs, categoryID: nil)
+        } catch {
+            Log.line("whole call failed: \(error)")
         }
         reload()
         onRulesChanged?()

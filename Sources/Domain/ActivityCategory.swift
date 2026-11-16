@@ -96,10 +96,13 @@ public struct CategoryResolution: Equatable, Sendable {
     public var guess: ActivityCategory
     /// A rule of yours or a manual correction decided it.
     public var edited: Bool
+    /// The whole call counts as Meetings, whatever was in front.
+    public var wholeCall: Bool
 
-    public init(category: ActivityCategory, guess: ActivityCategory, edited: Bool) {
+    public init(category: ActivityCategory, guess: ActivityCategory, edited: Bool, wholeCall: Bool = false) {
         self.category = category
         self.guess = guess
         self.edited = edited
+        self.wholeCall = wholeCall
     }
 }
