@@ -39,6 +39,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
         viewModel.onAlways = { [weak self] correction in self?.always(correction) }
         viewModel.onSplitCall = { [weak self] block in self?.splitCall(block) }
+        viewModel.onDeleteBlock = { [weak self] block in self?.deleteBlock(block) }
         viewModel.onWholeCall = { [weak self] call in self?.wholeCall(call) }
         viewModel.onOpenSystemSettings = { engine.openSystemSettings() }
         viewModel.onResume = { engine.resume() }
@@ -101,6 +102,16 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
             try engine.store.setManualCategory(segmentIDs: block.segmentIDs, categoryID: unpinned ? nil : category.id)
         } catch {
             Log.line("correction failed: \(error)")
+        }
+        reload()
+        onRulesChanged?()
+    }
+
+    private func deleteBlock(_ block: Block) {
+        do {
+            try engine.store.deleteSegments(ids: block.segmentIDs)
+        } catch {
+            Log.line("delete block failed: \(error)")
         }
         reload()
         onRulesChanged?()

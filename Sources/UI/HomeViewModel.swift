@@ -99,6 +99,15 @@ public final class HomeViewModel: ObservableObject {
     /// A split call counts as one Meetings block again.
     public var onWholeCall: ((DayReport.Call) -> Void)?
 
+    /// "Delete": the block's time is removed and becomes a gap.
+    public var onDeleteBlock: ((Block) -> Void)?
+
+    public func deleteBlock(_ block: Block) {
+        selection = nil
+        pendingCorrection = nil
+        onDeleteBlock?(block)
+    }
+
     public func splitCall(_ block: Block) {
         selection = block.id
         pendingCorrection = nil

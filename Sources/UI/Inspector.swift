@@ -4,6 +4,9 @@ import SwiftUI
 /// Right column, 320 pt (spec 5.3, screens 01 and 02).
 struct Inspector: View {
     @ObservedObject var vm: HomeViewModel
+    /// The block whose "Delete" is waiting for a yes; another selection drops it.
+    @State private var confirmingDelete: Int64?
+    @State private var deleteHover = false
 
     var body: some View {
         Group {
@@ -22,10 +25,47 @@ struct Inspector: View {
 
     // MARK: - Selected block
 
+    /// "SELECTED BLOCK" with a quiet Delete; asking turns the row into the question.
+    /// The block still being recorded has no Delete: it is not finished yet.
+    @ViewBuilder
+    private func header(_ b: Block) -> some View {
+        if confirmingDelete == b.id {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("Delete \(Fmt.longDuration(b.duration))?").font(.system(size: 13)).foregroundStyle(Theme.text)
+                    Spacer()
+                    Button("Cancel") { confirmingDelete = nil }
+                        .buttonStyle(.plain).font(.system(size: 12))
+                        .padding(.horizontal, 10).frame(height: 22)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Theme.railFill))
+                        .keyboardShortcut(.cancelAction)
+                    Button("Delete") { confirmingDelete = nil; vm.deleteBlock(b) }
+                        .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(.white)
+                        .padding(.horizontal, 10).frame(height: 22)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Theme.danger))
+                }
+                Text("The time becomes a gap. This can't be undone.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            }
+        } else {
+            HStack {
+                Text("SELECTED BLOCK").eyebrow()
+                Spacer()
+                if !b.isOpen {
+                    Button("Delete") { confirmingDelete = b.id }
+                        .buttonStyle(.plain).font(.system(size: 12))
+                        .foregroundStyle(deleteHover ? Theme.danger : Theme.textFaint)
+                        .onHover { deleteHover = $0 }
+                        .accessibilityHint("Asks before deleting this block's time")
+                }
+            }
+        }
+    }
+
     private func selected(_ b: Block) -> some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("SELECTED BLOCK").eyebrow()
+                header(b)
                 Text(Fmt.range(b.start, b.end, open: b.isOpen))
                     .font(.system(size: 26, weight: .light).monospacedDigit())
                     .padding(.top, 6)

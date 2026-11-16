@@ -65,6 +65,15 @@ public final class SegmentStore {
         }
     }
 
+    /// "Delete" on a block: its time becomes a gap.
+    public func deleteSegments(ids: [Int64]) throws {
+        guard !ids.isEmpty else { return }
+        let marks = ids.map { _ in "?" }.joined(separator: ",")
+        try db.pool.write { db in
+            try db.execute(sql: "DELETE FROM segment WHERE id IN (\(marks))", arguments: StatementArguments(ids))
+        }
+    }
+
     /// End of the newest segment, if any history exists.
     public func lastEnd() throws -> Int64? {
         try db.pool.read { try Int64.fetchOne($0, sql: "SELECT MAX(end) FROM segment") }

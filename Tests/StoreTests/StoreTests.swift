@@ -93,6 +93,16 @@ import Testing
         #expect(try store.segments(from: 0, to: 100)[0].manualCategoryID == nil)
     }
 
+    @Test func deletingABlockLeavesAGap() throws {
+        let store = SegmentStore(database: try db())
+        let a = Activity(appBundleID: "a", appName: "A"), b = Activity(appBundleID: "b", appName: "B")
+        try store.apply([.begin(SegmentDraft(start: 10, kind: .active, activity: a)), .end(at: 20),
+                         .begin(SegmentDraft(start: 20, kind: .active, activity: b)), .end(at: 30)])
+        let rows = try store.segments(from: 0, to: 100)
+        try store.deleteSegments(ids: [rows[0].id])
+        #expect(try store.segments(from: 0, to: 100).map(\.start) == [20])
+    }
+
     @Test func newCategoryAndRename() throws {
         let d = try db()
         var c = try d.addCategory(name: "Admin", color: "#9B7CFF")
