@@ -99,6 +99,11 @@ public final class HomeViewModel: ObservableObject {
     /// A split call counts as one Meetings block again.
     public var onWholeCall: ((DayReport.Call) -> Void)?
 
+    /// "Note": what you wrote on a block; empty removes it.
+    public var onSetNote: ((Block, String) -> Void)?
+
+    public func setNote(_ block: Block, _ note: String) { onSetNote?(block, note) }
+
     /// "Delete": the block's time is removed and becomes a gap.
     public var onDeleteBlock: ((Block) -> Void)?
 

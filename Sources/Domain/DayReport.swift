@@ -25,6 +25,8 @@ public struct Block: Equatable, Identifiable, Sendable {
     public var isOpen = false
     /// Set when the block is a whole call: what was in front during it.
     public var call: CallDetail?
+    /// What you wrote on it: the first note among its segments.
+    public var note: String?
 }
 
 /// A call that counts as one Meetings block, and the proof of what you did on it.
@@ -219,6 +221,10 @@ public struct DayReport: Equatable, Sendable {
             let call = callNames[s.id]
             return (call?.name ?? "Call", call?.title ?? "Call", resolve(plain).category)
         })
+        let notes = Dictionary(segments.compactMap { s in s.note.map { (s.id, $0) } }, uniquingKeysWith: { a, _ in a })
+        if !notes.isEmpty {
+            for i in blocks.indices { blocks[i].note = blocks[i].segmentIDs.lazy.compactMap { notes[$0] }.first }
+        }
         // The open segment can still be zero seconds long (just resumed, just
         // switched), which clipping drops; it is still what is in front.
         if isToday, var open = segments.last, open.kind == .active, open.end >= dayStart, now - open.end <= 15 {

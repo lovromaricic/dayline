@@ -81,6 +81,10 @@ public final class DaylineDatabase {
                 CREATE TABLE title_label (key TEXT PRIMARY KEY, label TEXT NOT NULL);
                 """)
         }
+        m.registerMigration("v4-notes") { db in
+            // A note you write on a block, kept on each of its segments.
+            try db.execute(sql: "ALTER TABLE segment ADD COLUMN note TEXT")
+        }
         return m
     }
 

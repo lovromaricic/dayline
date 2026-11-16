@@ -48,7 +48,8 @@ public final class SegmentStore {
                               kind: SegmentKind(rawValue: r["kind"]) ?? .active,
                               appBundleID: r["app_bundle_id"], appName: r["app_name"], title: r["title"],
                               host: r["host"], domain: r["domain"], call: r["call"],
-                              manualCategoryID: (r["category_source"] as String?) == "manual" ? r["category_id"] : nil)
+                              manualCategoryID: (r["category_source"] as String?) == "manual" ? r["category_id"] : nil,
+                              note: r["note"])
             }
         }
     }
@@ -62,6 +63,18 @@ public final class SegmentStore {
                 UPDATE segment SET category_id = ?, category_source = ? WHERE id IN (\(marks))
                 """, arguments: StatementArguments([categoryID, categoryID == nil ? nil : "manual"] as [DatabaseValueConvertible?]
                                                    + segmentIDs.map { $0 as DatabaseValueConvertible? }))
+        }
+    }
+
+    /// A block's note, on all of its segments; empty removes it.
+    public func setNote(segmentIDs: [Int64], note: String) throws {
+        guard !segmentIDs.isEmpty else { return }
+        let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let marks = segmentIDs.map { _ in "?" }.joined(separator: ",")
+        try db.pool.write { db in
+            try db.execute(sql: "UPDATE segment SET note = ? WHERE id IN (\(marks))",
+                           arguments: StatementArguments([text.isEmpty ? nil : text] as [DatabaseValueConvertible?]
+                                                         + segmentIDs.map { $0 as DatabaseValueConvertible? }))
         }
     }
 

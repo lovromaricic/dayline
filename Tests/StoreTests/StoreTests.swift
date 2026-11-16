@@ -103,6 +103,16 @@ import Testing
         #expect(try store.segments(from: 0, to: 100).map(\.start) == [20])
     }
 
+    @Test func notesRoundTripAndClear() throws {
+        let store = SegmentStore(database: try db())
+        try store.apply([.begin(SegmentDraft(start: 10, kind: .active, activity: Activity(appBundleID: "a", appName: "A"))), .end(at: 20)])
+        let id = try store.segments(from: 0, to: 100)[0].id
+        try store.setNote(segmentIDs: [id], note: "  Loan flow  ")
+        #expect(try store.segments(from: 0, to: 100)[0].note == "Loan flow")
+        try store.setNote(segmentIDs: [id], note: " ")
+        #expect(try store.segments(from: 0, to: 100)[0].note == nil)
+    }
+
     @Test func newCategoryAndRename() throws {
         let d = try db()
         var c = try d.addCategory(name: "Admin", color: "#9B7CFF")

@@ -40,6 +40,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onAlways = { [weak self] correction in self?.always(correction) }
         viewModel.onSplitCall = { [weak self] block in self?.splitCall(block) }
         viewModel.onDeleteBlock = { [weak self] block in self?.deleteBlock(block) }
+        viewModel.onSetNote = { [weak self] block, note in self?.setNote(block, note) }
         viewModel.onWholeCall = { [weak self] call in self?.wholeCall(call) }
         viewModel.onOpenSystemSettings = { engine.openSystemSettings() }
         viewModel.onResume = { engine.resume() }
@@ -105,6 +106,15 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         }
         reload()
         onRulesChanged?()
+    }
+
+    private func setNote(_ block: Block, _ note: String) {
+        do {
+            try engine.store.setNote(segmentIDs: block.segmentIDs, note: note)
+        } catch {
+            Log.line("note failed: \(error)")
+        }
+        reload()
     }
 
     private func deleteBlock(_ block: Block) {

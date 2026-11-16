@@ -286,3 +286,12 @@ extension DayReportTests {
         #expect(r.blocks.count == 1 && r.blocks[0].title == "Teams call")
     }
 }
+
+extension DayReportTests {
+    @Test mutating func aBlockShowsItsNote() {
+        var segs = [seg(at(9), at(9, 20)), seg(at(9, 20), at(9, 40)), seg(at(10), at(10, 20), "figma")]
+        segs[1].note = "Loan flow errors"
+        let r = report(segs)
+        #expect(r.blocks.map(\.note) == ["Loan flow errors", nil])
+    }
+}

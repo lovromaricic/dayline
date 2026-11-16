@@ -87,6 +87,7 @@ struct Inspector: View {
                 }
             }
             categorySelect(b)
+            NoteField(vm: vm, block: b)
             if let call = vm.splitCall(containing: b) { wholeCall(call) }
             if let c = vm.pendingCorrection, c.blockID == b.id {
                 prompt(c)
@@ -328,5 +329,51 @@ struct Inspector: View {
             Text(week == nil ? "Click a block to inspect it or fix its category." : "Click a day to open it.")
                 .font(.system(size: 12)).foregroundStyle(Theme.textFaint).lineSpacing(2)
         }
+    }
+}
+
+/// "Note": a line on what you did, saved when you press Return, leave the
+/// field or pick another block.
+private struct NoteField: View {
+    @ObservedObject var vm: HomeViewModel
+    var block: Block
+    @State private var text = ""
+    /// The block the text belongs to, so a switch saves to the right one.
+    @State private var editing: Block?
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Note").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            TextField("What did you work on?", text: $text, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .lineLimit(1...5)
+                .focused($focused)
+                .padding(.horizontal, 12).padding(.vertical, 11)
+                .frame(minHeight: 40)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Theme.surfaceControl))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Theme.textFaint : Theme.border))
+                .onSubmit { save(); focused = false }
+                .onExitCommand { text = editing?.note ?? ""; focused = false }
+                .accessibilityLabel("Note")
+        }
+        .onAppear { load(block) }
+        .onChange(of: block.id) { save(); load(block) }
+        .onChange(of: focused) { if !focused { save() } }
+        .onDisappear { save() }
+    }
+
+    private func load(_ b: Block) {
+        editing = b
+        text = b.note ?? ""
+    }
+
+    private func save() {
+        guard let b = editing else { return }
+        let new = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard new != (b.note ?? "") else { return }
+        editing?.note = new.isEmpty ? nil : new
+        vm.setNote(b, new)
     }
 }
