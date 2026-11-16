@@ -118,8 +118,8 @@ struct GeneralPage: View {
                                subtitle: "While the mic or camera is on, the whole call counts as Meetings and you stay tracked, even if you are not typing.") {
                         toggle("Count calls as meetings", vm.callsActive, vm.onSetCallsActive)
                     }
-                    SettingRow(title: "Read Chrome tab titles", subtitle: "Uses the window title, so no extension is needed.") {
-                        toggle("Read Chrome tab titles", vm.chromeTitles, vm.onSetChromeTitles)
+                    SettingRow(title: "Read browser tab titles", subtitle: "Chrome and Safari. Uses the window title, so no extension is needed.") {
+                        toggle("Read browser tab titles", vm.chromeTitles, vm.onSetChromeTitles)
                     }
                 }
                 group("PERMISSIONS") {
@@ -152,7 +152,7 @@ struct PrivacyPage: View {
                 pageHeader("Privacy & data", "Everything stays on this Mac. Decide what Dayline ignores and what it keeps.")
                 group("PRIVATE BROWSING") {
                     SettingRow(title: "Private browsing windows",
-                               subtitle: vm.skipPrivate ? "Chrome Incognito windows are skipped." : "Chrome Incognito windows are recorded like any other window.",
+                               subtitle: vm.skipPrivate ? "Chrome Incognito and Safari Private windows are skipped." : "Chrome Incognito and Safari Private windows are recorded like any other window.",
                                first: true) {
                         toggle("Skip private browsing windows", vm.skipPrivate, vm.onSetSkipPrivate)
                     }

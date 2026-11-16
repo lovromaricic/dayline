@@ -4,15 +4,15 @@ import Domain
 
 /// Follows the frontmost app and its focused window title, event-driven:
 /// NSWorkspace activation plus an AXObserver on the frontmost app.
-/// Reports `nil` for Chrome Incognito windows and for Dayline's own windows.
+/// Reports `nil` for Chrome Incognito and Safari Private windows and for Dayline's own windows.
 ///
 /// AX calls are blocking IPC to the target app, so reads run on a background
 /// queue with a 1 s timeout; a hung app cannot stall the main thread.
 public final class FrontmostWatcher {
     public var onActivity: ((Activity?) -> Void)?
-    /// Settings "Read Chrome tab titles": off keeps the site but drops the title.
+    /// Settings "Read browser tab titles": off keeps the site but drops the title.
     public var readChromeTitles = true
-    /// Settings "Private browsing windows": off records Incognito like any window.
+    /// Settings "Private browsing windows": off records Incognito and Private like any window.
     public var skipPrivateWindows = true
 
     private let readQueue = DispatchQueue(label: "app.dayline.ax-read", qos: .utility)
@@ -142,6 +142,11 @@ public final class FrontmostWatcher {
     private static func readActivity(_ appEl: AXUIElement, bundleID: String, name: String,
                                      chromeTitles: Bool, skipPrivate: Bool) -> Activity? {
         let window = AX.focusedWindow(of: appEl)
+        if SafariReader.bundleIDs.contains(bundleID), let window {
+            let snap = SafariReader.read(window: window)
+            if snap.isPrivate && skipPrivate { return nil }
+            return .browser(appBundleID: bundleID, appName: name, title: chromeTitles ? snap.title : nil, url: snap.url)
+        }
         guard ChromeReader.bundleIDs.contains(bundleID), let window else {
             return Activity(appBundleID: bundleID, appName: name, title: window.flatMap { AX.string($0, kAXTitleAttribute) })
         }

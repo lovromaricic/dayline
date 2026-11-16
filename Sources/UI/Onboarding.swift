@@ -79,7 +79,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(waiting ? "Switch Dayline on in System Settings" : "Allow Accessibility access").font(.system(size: 16))
                 Text(waiting ? "Find Dayline under Privacy & Security → Accessibility. This screen updates by itself."
-                     : "Lets Dayline read window titles, including Chrome tab titles. Nothing leaves your Mac.")
+                     : "Lets Dayline read window titles, including browser tab titles. Nothing leaves your Mac.")
                     .font(.system(size: 13)).foregroundStyle(Theme.textMuted).fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -158,7 +158,7 @@ struct OnboardingView: View {
 
     private var privacyPanel: some View {
         VStack(alignment: .leading, spacing: 32) {
-            list("WHAT DAYLINE SEES", ok: true, ["Which app you are in", "Window and Chrome tab titles", "When you are active or away"])
+            list("WHAT DAYLINE SEES", ok: true, ["Which app you are in", "Window and browser tab titles", "When you are active or away"])
             list("WHAT IT NEVER SEES", ok: false, ["Screenshots or screen contents", "Keystrokes or clipboard", "Page contents"])
             Spacer(minLength: 0)
             Text("Everything is stored on this Mac. You can exclude any app or site in Settings.")
