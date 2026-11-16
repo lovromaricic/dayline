@@ -114,9 +114,9 @@ struct GeneralPage: View {
                                first: true) {
                         select(minutesLabel(vm.idleMinutes), options: vm.idleChoices, label: minutesLabel) { vm.onSetIdleMinutes?($0) }
                     }
-                    SettingRow(title: "Count calls as active",
-                               subtitle: "Mic or camera in use keeps you tracked, even if you are not typing. Apps without a category of their own count as Meetings.") {
-                        toggle("Count calls as active", vm.callsActive, vm.onSetCallsActive)
+                    SettingRow(title: "Count calls as meetings",
+                               subtitle: "While the mic or camera is on, the whole call counts as Meetings and you stay tracked, even if you are not typing.") {
+                        toggle("Count calls as meetings", vm.callsActive, vm.onSetCallsActive)
                     }
                     SettingRow(title: "Read Chrome tab titles", subtitle: "Uses the window title, so no extension is needed.") {
                         toggle("Read Chrome tab titles", vm.chromeTitles, vm.onSetChromeTitles)

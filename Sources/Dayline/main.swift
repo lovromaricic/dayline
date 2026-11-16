@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settings?.refresh()
         }
         recap = Recap(engine: engine)
+        recap.checkPermission()
         recap.onOpenDay = { [weak self] day in
             self?.statusItem.closePopover()
             self?.timeline.open(day: day)

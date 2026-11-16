@@ -13,7 +13,7 @@ import Domain
 ///    Figma stays Design. This is what a call split into "What I was doing" shows
 /// 7. Uncategorized
 public struct Categorizer: Sendable {
-    /// Spec setting "Count calls as active".
+    /// Setting "Count calls as meetings".
     public var callsAreMeetings = true
     /// Whole calls start here: older data flags only the call window, so its
     /// calls would come out as slivers. Before this, step 2 is skipped.

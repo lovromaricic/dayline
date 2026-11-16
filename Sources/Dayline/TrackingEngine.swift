@@ -72,7 +72,7 @@ final class TrackingEngine {
         set { try? database.setSetting("recap.lastDay", newValue.map(String.init)) }
     }
 
-    /// "Count calls as active": a call keeps you from going away and counts as Meetings.
+    /// "Count calls as meetings": a call keeps you from going away and counts as Meetings.
     var callsActive: Bool {
         get { flag("calls.active", default: true) }
         set {

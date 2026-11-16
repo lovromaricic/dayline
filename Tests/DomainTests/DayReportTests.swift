@@ -274,3 +274,15 @@ extension DayReportTests {
         #expect(r.tracked == 50 * 60)
     }
 }
+
+extension DayReportTests {
+    @Test mutating func aCallIsNamedAfterWhereMostOfItWas() {
+        // A huddle with the mic still on as you join a Teams meeting.
+        var teams = seg(at(13, 1), at(13, 30), "chrome", title: "Planning | Microsoft Teams", call: true)
+        teams.host = "teams.microsoft.com"
+        let r = report([seg(at(12, 58), at(13, 1), "chrome", title: "Enes - Acme - Slack", call: true), teams])
+        #expect(r.calls.first?.name == "Teams call")
+        #expect(r.calls.first?.people == nil)
+        #expect(r.blocks.count == 1 && r.blocks[0].title == "Teams call")
+    }
+}

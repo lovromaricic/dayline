@@ -23,6 +23,16 @@ final class Recap: NSObject, UNUserNotificationCenterDelegate {
         Bundle.main.bundleIdentifier == nil ? nil : .current()
     }
 
+    /// At launch, with the recap on: log what macOS allows, and ask again if
+    /// it never answered (a new build can lose the earlier answer).
+    func checkPermission() {
+        guard engine.recapHour != nil, let center = Self.center else { return }
+        center.getNotificationSettings { s in
+            Log.line("recap permission status \(s.authorizationStatus.rawValue) alert \(s.alertSetting.rawValue) style \(s.alertStyle.rawValue) center \(s.notificationCenterSetting.rawValue)")
+            if s.authorizationStatus == .notDetermined { Self.requestPermission() }
+        }
+    }
+
     static func requestPermission() {
         center?.requestAuthorization(options: [.alert, .sound]) { granted, error in
             Log.line("recap permission \(granted)\(error.map { " \($0.localizedDescription)" } ?? "")")

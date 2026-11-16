@@ -382,7 +382,9 @@ public struct DayReport: Equatable, Sendable {
     }
 
     /// Runs of call-flagged segments (the raw flags, before narrowing) with
-    /// gaps under a minute, named after where the call took place.
+    /// gaps under a minute, named after where most of the call took place: a
+    /// huddle that moves on to a Teams meeting with the mic still on is the
+    /// Teams call.
     static func calls(in segments: [Segment]) -> [Call] {
         var runs: [[Segment]] = []
         var open = false
@@ -397,9 +399,12 @@ public struct DayReport: Equatable, Sendable {
         }
         return runs.filter { $0.last!.end - $0.first!.start >= minCall }.map { run in
             let names = run.map { Titles.callName(appBundleID: $0.appBundleID, appName: $0.appName, host: $0.host, title: $0.title) }
-            let people = run.lazy.compactMap { Titles.callPeople(host: $0.host, title: $0.title) }.first
-            return Call(start: run.first!.start, end: run.last!.end, name: names.first { !$0.hasPrefix("Call in ") } ?? names[0],
-                        people: people, segmentIDs: run.map(\.id))
+            var time: [String: Int64] = [:]
+            for (s, n) in zip(run, names) where !n.hasPrefix("Call in ") { time[n, default: 0] += s.duration }
+            let name = names.first { time[$0] == time.values.max() } ?? names[0]
+            // Who was on it, from a huddle window; only when the call is the huddle.
+            let people = name == "Slack huddle" ? run.lazy.compactMap { Titles.callPeople(host: $0.host, title: $0.title) }.first : nil
+            return Call(start: run.first!.start, end: run.last!.end, name: name, people: people, segmentIDs: run.map(\.id))
         }
     }
 
