@@ -14,6 +14,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     private(set) var dayStart: Int64
     /// The window shows today and should move on to the next day at midnight.
     private var followsToday = true
+    /// The calendar day the window was last opened on.
+    private var openedOn: Int64?
     /// The day's segments as last loaded, for corrections.
     private var segments: [Segment] = []
     /// Rules changed: the popover and menu bar total need a refresh too.
@@ -122,10 +124,13 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
 
     func show() {
         if window == nil { window = makeWindow() }
-        // Reopening jumps back to today, and so does a window that was
-        // showing today when midnight passed.
-        if !(window?.isVisible ?? false) { followsToday = true }
-        if followsToday { dayStart = Self.startOfDay(Date()) }
+        // Reopening jumps back to today, and so does opening it on a new day
+        // (the window usually stays open behind other apps, holding the day
+        // you last looked at), and a window showing today when midnight passed.
+        let today = Self.startOfDay(Date())
+        if !(window?.isVisible ?? false) || openedOn != today { followsToday = true }
+        openedOn = today
+        if followsToday { dayStart = today }
         unsortedAt = 0
         viewModel.replay += 1
         if window?.contentView !== homeView { window?.contentView = homeView }
