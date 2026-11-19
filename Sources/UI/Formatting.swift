@@ -30,6 +30,11 @@ enum Fmt {
     }
 
     /// "9 – 15 NOVEMBER", or "27 OCTOBER – 2 NOVEMBER" across months.
+    /// "NOVEMBER 2026".
+    static func monthEyebrow(_ monthStart: Int64) -> String {
+        date(monthStart).formatted(.dateTime.month(.wide).year()).uppercased()
+    }
+
     static func weekEyebrow(_ weekStart: Int64) -> String {
         let start = date(weekStart)
         let end = Calendar.current.date(byAdding: .day, value: 6, to: start)!

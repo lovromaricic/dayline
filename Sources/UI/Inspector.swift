@@ -264,12 +264,12 @@ struct Inspector: View {
 
     // MARK: - Nothing selected
 
-    /// In the week view the panel sums the week instead of the day.
-    private var week: WeekReport? { vm.period == .week ? vm.week : nil }
+    /// In the week and month views the panel sums those instead of the day.
+    private var week: WeekReport? { vm.period == .day ? nil : vm.week }
     private var topApps: [DayReport.AppTotal] { week?.topApps ?? vm.report.topApps }
     private var longestFocus: DayReport.Focus? { week.map { $0.longestFocus } ?? vm.report.longestFocus }
     private var topAppsTitle: String {
-        if let week { return week.containsToday ? "TOP APPS THIS WEEK" : "TOP APPS" }
+        if let week { return week.containsToday ? (week.isMonth ? "TOP APPS THIS MONTH" : "TOP APPS THIS WEEK") : "TOP APPS" }
         return vm.report.isToday ? "TOP APPS TODAY" : "TOP APPS"
     }
 

@@ -228,7 +228,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         // Past days do not change; only today needs the 5 s refresh. After
         // midnight a window that was showing today moves on to the new day.
         if followsToday && dayStart != today { dayStart = today }
-        if dayStart == today || viewModel.period == .week && viewModel.week?.containsToday == true { reload() }
+        if dayStart == today || viewModel.period != .day && viewModel.week?.containsToday == true { reload(ticking: true) }
     }
 
     /// Opens the window on a given day (the recap notification).
@@ -239,23 +239,31 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
 
     private func show(day: Int64) {
         let today = Self.startOfDay(Date())
-        let before = viewModel.period == .week ? weekStart(dayStart) : dayStart
+        let before = spanStart(dayStart)
         dayStart = min(day, today)
         followsToday = dayStart == today
         reload()
-        // A new day, or a new week in the week view: the charts grow in again.
-        if (viewModel.period == .week ? weekStart(dayStart) : dayStart) != before { viewModel.replay += 1 }
+        // A new day, or a new week or month in those views: the charts grow in again.
+        if spanStart(dayStart) != before { viewModel.replay += 1 }
     }
 
     private func move(days: Int) {
         let cal = Calendar.current
-        // The arrows step a whole week in the week view.
-        let step = viewModel.period == .week ? days * 7 : days
-        let d = cal.date(byAdding: .day, value: step, to: Date(timeIntervalSince1970: TimeInterval(dayStart)))!
+        let from = Date(timeIntervalSince1970: TimeInterval(dayStart))
+        // The arrows step a whole week or month in those views.
+        let d = switch viewModel.period {
+        case .day: cal.date(byAdding: .day, value: days, to: from)!
+        case .week: cal.date(byAdding: .day, value: days * 7, to: from)!
+        // From the 1st, so 31 March back a month is 1 February, not 3 March.
+        case .month: cal.date(byAdding: .month, value: days, to: cal.dateInterval(of: .month, for: from)!.start)!
+        }
         show(day: Self.startOfDay(d))
     }
 
-    private func reload() {
+    /// `ticking`: the 5 s refresh, where past days in a week or month are
+    /// reused; any other reload (a correction, a rule) builds them again.
+    private func reload(ticking: Bool = false) {
+        if !ticking { pastDays = [:] }
         let next = Int64(Calendar.current.date(byAdding: .day, value: 1,
                                                to: Date(timeIntervalSince1970: TimeInterval(dayStart)))!.timeIntervalSince1970)
         segments = (try? engine.store.segments(from: dayStart, to: next)) ?? []
@@ -264,7 +272,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         let report = DayReport(segments: segments, dayStart: dayStart, now: TrackingEngine.now(),
                                resolve: { categorizer.resolve($0) })
         viewModel.update(engine.hidesTitlesNow ? report.hidingTitles() : report)
-        let week = viewModel.period == .week ? loadWeek() : nil
+        let week = viewModel.period == .day ? nil : loadSpan()
         if viewModel.week != week { viewModel.week = week }
         // A week of reports: at most once a minute, or right away after show().
         let now = TrackingEngine.now()
@@ -278,27 +286,41 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     }
 
     private var unsortedAt: Int64 = 0
+    /// Past days of the week or month on screen; they don't change between ticks.
+    private var pastDays: [Int64: DayReport] = [:]
 
-    private func weekStart(_ day: Int64) -> Int64 {
+    /// The calendar week or month around `day` in those views; the day itself in the day view.
+    private func spanStart(_ day: Int64) -> Int64 {
         let anchor = Date(timeIntervalSince1970: TimeInterval(day))
-        return Int64((Calendar.current.dateInterval(of: .weekOfYear, for: anchor)?.start ?? anchor).timeIntervalSince1970)
+        let unit: Calendar.Component
+        switch viewModel.period {
+        case .day: return day
+        case .week: unit = .weekOfYear
+        case .month: unit = .month
+        }
+        return Int64((Calendar.current.dateInterval(of: unit, for: anchor)?.start ?? anchor).timeIntervalSince1970)
     }
 
-    /// The calendar week around `dayStart`, one DayReport per day up to today.
-    private func loadWeek() -> WeekReport {
+    /// The calendar week or month around `dayStart`, one DayReport per day up to today.
+    private func loadSpan() -> WeekReport {
         let cal = Calendar.current
+        let month = viewModel.period == .month
         let anchor = Date(timeIntervalSince1970: TimeInterval(dayStart))
-        let start = cal.dateInterval(of: .weekOfYear, for: anchor)?.start ?? anchor
-        let starts = (0..<7).map { Self.startOfDay(cal.date(byAdding: .day, value: $0, to: start)!) }
+        let start = cal.dateInterval(of: month ? .month : .weekOfYear, for: anchor)?.start ?? anchor
+        let count = month ? cal.range(of: .day, in: .month, for: anchor)?.count ?? 30 : 7
+        let starts = (0..<count).map { Self.startOfDay(cal.date(byAdding: .day, value: $0, to: start)!) }
         let today = Self.startOfDay(Date()), now = TrackingEngine.now()
         let categorizer = engine.categorizer
         let reports = starts.filter { $0 <= today }.map { day in
+            if day < today, let kept = pastDays[day] { return kept }
             let next = Self.startOfDay(cal.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: TimeInterval(day)))!)
             let segs = (try? engine.store.segments(from: day, to: next)) ?? []
             let report = DayReport(segments: segs, dayStart: day, now: now, resolve: { categorizer.resolve($0) })
-            return engine.hidesTitlesNow ? report.hidingTitles() : report
+            let shown = engine.hidesTitlesNow ? report.hidingTitles() : report
+            if day < today { pastDays[day] = shown }
+            return shown
         }
-        return WeekReport(weekStart: starts[0], reports: reports, dayStarts: starts, today: today)
+        return WeekReport(weekStart: starts[0], reports: reports, dayStarts: starts, today: today, isMonth: month)
     }
 
     private func makeWindow() -> NSWindow {

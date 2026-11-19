@@ -43,4 +43,14 @@ import Testing
         #expect(!empty.containsToday)
         #expect(empty.headline().0 == "Nothing was tracked this week.")
     }
+
+    @Test func monthHeadlineNamesTheDate() {
+        let reports = [report(0, [("zoom", 3600)], today: 2), report(2, [("xcode", 5 * 3600)], today: 2)]
+        let m = WeekReport(weekStart: monday, reports: reports, dayStarts: (0..<30).map(dayStart), today: dayStart(2), isMonth: true)
+        #expect(m.days.count == 30)
+        #expect(m.headline().0 == "Mostly Development this month,")
+        let day = Calendar.current.component(.day, from: Date(timeIntervalSince1970: TimeInterval(dayStart(2))))
+        #expect(m.headline().1 == "the \(WeekReport.ordinal(day)) was the longest day.")
+        #expect(WeekReport.ordinal(22) == "22nd")
+    }
 }

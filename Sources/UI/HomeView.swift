@@ -103,8 +103,8 @@ public struct HomeView: View {
                         Color.clear.preference(key: HeaderBottom.self, value: g.frame(in: .named(SelectedRowFrame.space)).maxY)
                     }
                 }
-            if vm.period == .week, let week = vm.week {
-                WeekChart(vm: vm, week: week)
+            if vm.period != .day, let week = vm.week {
+                if week.isMonth { MonthChart(vm: vm, month: week) } else { WeekChart(vm: vm, week: week) }
             } else {
                 timeline
                 if vm.unsortedCount > 0 { unsortedNote }
@@ -176,10 +176,10 @@ public struct HomeView: View {
 
     // MARK: - Header
 
-    /// One header for day and week: the same views with new values, so the
-    /// big total rolls from the day's to the week's instead of swapping.
+    /// One header for day, week and month: the same views with new values, so
+    /// the big total rolls from the day's to the week's instead of swapping.
     private var summaryHeader: some View {
-        if vm.period == .week, let w = vm.week {
+        if vm.period != .day, let w = vm.week {
             let (first, second) = w.headline()
             let days = "\(w.trackedDays) day\(w.trackedDays == 1 ? "" : "s")"
             let subtitle = w.trackedDays > 1 ? "\(days) · avg \(Durations.format(w.average))" : w.trackedDays == 1 ? days : "Tracked"
@@ -224,21 +224,23 @@ public struct HomeView: View {
         return tracked
     }
 
-    /// Today, or the week that holds today: nothing later to move to.
-    private var atLatest: Bool { vm.period == .week ? vm.week?.containsToday ?? true : r.isToday }
+    /// Today, or the week or month that holds today: nothing later to move to.
+    private var atLatest: Bool { vm.period == .day ? r.isToday : vm.week?.containsToday ?? true }
 
     /// Spec 5.3: the Day/Week switch, the date, and a quiet chevron pair;
     /// click the date for a picker.
     /// Two copies (header and sticky bar), each with its own date picker.
     private func dayNavigation(picking: Binding<Bool>) -> some View {
-        let week = vm.period == .week
+        let p = vm.period
+        let start = vm.week?.weekStart ?? r.dayStart
+        let unit = p.rawValue.lowercased()
         return HStack(spacing: 6) {
             PeriodSwitch(vm: vm).padding(.trailing, 8)
             Button(action: { picking.wrappedValue = true }) {
-                Text(week ? Fmt.weekEyebrow(vm.week?.weekStart ?? r.dayStart) : Fmt.dayEyebrow(r.dayStart)).eyebrow()
+                Text(p == .month ? Fmt.monthEyebrow(start) : p == .week ? Fmt.weekEyebrow(start) : Fmt.dayEyebrow(r.dayStart)).eyebrow()
             }
             .buttonStyle(.plain)
-            .help(week ? "Pick a week" : "Pick a day")
+            .help("Pick a \(unit)")
             .popover(isPresented: picking, arrowEdge: .bottom) {
                 DatePicker("", selection: Binding(
                     get: { Fmt.date(r.dayStart) },
@@ -248,14 +250,14 @@ public struct HomeView: View {
                     .labelsHidden()
                     .padding(12)
             }
-            chevron("chevron.left", label: week ? "Previous week" : "Previous day", enabled: true) { vm.onMoveDay?(-1) }
-            chevron("chevron.right", label: week ? "Next week" : "Next day", enabled: !atLatest) { vm.onMoveDay?(1) }
+            chevron("chevron.left", label: "Previous \(unit)", enabled: true) { vm.onMoveDay?(-1) }
+            chevron("chevron.right", label: "Next \(unit)", enabled: !atLatest) { vm.onMoveDay?(1) }
         }
     }
 
     /// Once the header scrolls away: the same date line and the total, small.
     private var stickyBar: some View {
-        let total = vm.period == .week ? vm.week?.tracked ?? 0 : r.tracked
+        let total = vm.period == .day ? r.tracked : vm.week?.tracked ?? 0
         return HStack(spacing: 0) {
             dayNavigation(picking: $pickingDayInBar)
             Spacer(minLength: 16)
@@ -314,7 +316,7 @@ public struct HomeView: View {
     }
 }
 
-/// Day | Week, at the start of the date line.
+/// Day | Week | Month, at the start of the date line.
 private struct PeriodSwitch: View {
     @ObservedObject var vm: HomeViewModel
 
@@ -336,7 +338,7 @@ private struct PeriodSwitch: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Show a day or a week")
+        .accessibilityLabel("Show a day, a week or a month")
     }
 }
 

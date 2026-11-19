@@ -1,10 +1,11 @@
 import Domain
 import Foundation
 
-/// Day or week, switched next to the date (spec 5.3).
+/// Day, week or month, switched next to the date (spec 5.3).
 public enum Period: String, CaseIterable, Sendable {
     case day = "Day"
     case week = "Week"
+    case month = "Month"
 }
 
 public enum TimelineMode: String, CaseIterable, Sendable {
@@ -49,7 +50,7 @@ public struct Correction: Equatable, Sendable {
 public final class HomeViewModel: ObservableObject {
     @Published public var report: DayReport
     @Published public private(set) var period = Period.day
-    /// Set by the app while the week view is shown.
+    /// Set by the app while the week or month view is shown.
     @Published public var week: WeekReport?
     @Published public var selection: Int64?
     @Published public var mode = TimelineMode.byCategory

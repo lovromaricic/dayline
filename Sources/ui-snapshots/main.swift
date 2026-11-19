@@ -172,6 +172,24 @@ let weekReports = weekStarts.enumerated().filter { $0.element <= dayStart }.map 
 let weekVM = HomeViewModel(report: homeReport)
 weekVM.setPeriod(.week)
 weekVM.week = WeekReport(weekStart: weekStarts[0], reports: weekReports, dayStarts: weekStarts, today: dayStart)
+// Month view: the sample day on weekdays up to today, a varying length each day.
+let monthStart = Int64(cal.dateInterval(of: .month, for: Date())!.start.timeIntervalSince1970)
+let monthStarts = (0..<cal.range(of: .day, in: .month, for: Date())!.count).map {
+    Int64(cal.startOfDay(for: cal.date(byAdding: .day, value: $0, to: Date(timeIntervalSince1970: TimeInterval(monthStart)))!).timeIntervalSince1970)
+}
+let monthReports = monthStarts.enumerated().filter { $0.element <= dayStart }.compactMap { i, start -> DayReport? in
+    let weekday = cal.component(.weekday, from: Date(timeIntervalSince1970: TimeInterval(start)))
+    if weekday == 1 || weekday == 7 { return nil }
+    let shift = start - dayStart
+    var segs = Array(homeDay.prefix(3 + i % 5)).map { s -> Segment in
+        var c = s; c.id += Int64(i) * 100; c.start += shift; c.end += shift; return c
+    }
+    if i % 6 == 2 { segs.append(hseg(at(16, 10) + shift, at(16, 10) + shift + 4 * 3600, "Zoom", "Planning")) }
+    return DayReport(segments: segs, dayStart: start, now: start == dayStart ? now : start + 86_399, category: homeCategory)
+}
+let monthVM = HomeViewModel(report: homeReport)
+monthVM.setPeriod(.month)
+monthVM.week = WeekReport(weekStart: monthStarts[0], reports: monthReports, dayStarts: monthStarts, today: dayStart, isMonth: true)
 let unsortedVM = HomeViewModel(report: homeReport)
 unsortedVM.unsortedCount = 3
 unsortedVM.unsortedTotal = 3 * 3600 + 27 * 60
@@ -224,6 +242,7 @@ let homes: [(String, HomeViewModel)] = [
     ("home-12-call-split", splitVM),
     ("home-10-unsorted", unsortedVM),
     ("home-09-week", weekVM),
+    ("home-09-month", monthVM),
     ("home-08-filtered", filteredVM),
     ("home-01-selected", selectedVM),
     ("home-02-nothing-selected", HomeViewModel(report: homeReport)),

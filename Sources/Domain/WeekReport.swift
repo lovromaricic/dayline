@@ -2,7 +2,8 @@ import Foundation
 
 /// The week view (spec 5.3): one row per day, split by category, plus the
 /// week's totals. Built from the same DayReports as the day view, so a day
-/// adds up to the same number in both.
+/// adds up to the same number in both. The month view uses it too, with a
+/// month of days.
 public struct WeekReport: Equatable, Sendable {
     public struct CategoryTotal: Equatable, Sendable {
         public var category: ActivityCategory
@@ -21,7 +22,9 @@ public struct WeekReport: Equatable, Sendable {
     }
 
     public var weekStart: Int64
-    /// Seven days, in calendar order.
+    /// A calendar month rather than a week.
+    public var isMonth: Bool
+    /// Seven days (or a month of them), in calendar order.
     public var days: [Day]
     /// Largest first.
     public var categories: [CategoryTotal]
@@ -35,8 +38,9 @@ public struct WeekReport: Equatable, Sendable {
     public var average: Int64 { trackedDays == 0 ? 0 : tracked / Int64(trackedDays) }
 
     /// `reports` are the week's days in order; days after today may be absent.
-    public init(weekStart: Int64, reports: [DayReport], dayStarts: [Int64], today: Int64) {
+    public init(weekStart: Int64, reports: [DayReport], dayStarts: [Int64], today: Int64, isMonth: Bool = false) {
         self.weekStart = weekStart
+        self.isMonth = isMonth
         var byCategory: [ActivityCategory: Int64] = [:]
         var byApp: [String: Int64] = [:]
         for r in reports {
@@ -64,18 +68,30 @@ public struct WeekReport: Equatable, Sendable {
     }
 
     /// "Mostly Meetings this week," / "Thursday was the longest day."
+    /// A month names the date instead: "the 16th was the longest day."
     public func headline(calendar: Calendar = .current) -> (String, String) {
-        let when = containsToday ? " this week" : ""
+        let span = isMonth ? "month" : "week"
+        let when = containsToday ? " this \(span)" : ""
         guard tracked > 0, let top = categories.first else {
-            return containsToday ? ("Nothing tracked yet this week.", "Your days fill in here as you go.")
-                : ("Nothing was tracked this week.", "Dayline was off, paused or away.")
+            return containsToday ? ("Nothing tracked yet this \(span).", "Your days fill in here as you go.")
+                : ("Nothing was tracked this \(span).", "Dayline was off, paused or away.")
         }
         let first = Double(top.total) >= 0.4 * Double(tracked) || categories.count == 1
             ? "Mostly \(top.category.shortName)\(when),"
             : "A mix of \(categories[0].category.shortName) and \(categories[1].category.shortName)\(when),"
         let longest = days.max { $0.tracked < $1.tracked }!
-        let weekday = Date(timeIntervalSince1970: TimeInterval(longest.dayStart)).formatted(.dateTime.weekday(.wide))
+        let date = Date(timeIntervalSince1970: TimeInterval(longest.dayStart))
+        let weekday = isMonth ? "the \(Self.ordinal(calendar.component(.day, from: date)))"
+            : date.formatted(.dateTime.weekday(.wide))
         if trackedDays == 1 { return (first, containsToday ? "only \(weekday) so far." : "only \(weekday) was tracked.") }
         return (first, "\(weekday) was the longest day.")
+    }
+
+    /// 1st, 2nd, 3rd, 16th, 22nd.
+    static func ordinal(_ n: Int) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .ordinal
+        f.locale = Locale(identifier: "en")
+        return f.string(from: n as NSNumber) ?? "\(n)"
     }
 }

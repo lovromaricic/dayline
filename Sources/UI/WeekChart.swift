@@ -128,9 +128,16 @@ struct WeekChart: View {
         .accessibilityHidden(true)
     }
 
-    private var totals: some View {
+    private var totals: some View { CategoryTotals(categories: week.categories) }
+}
+
+/// The category totals under the week and month charts, largest first.
+struct CategoryTotals: View {
+    let categories: [WeekReport.CategoryTotal]
+
+    var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 32), count: 3), alignment: .leading, spacing: 12) {
-            ForEach(week.categories, id: \.category) { c in
+            ForEach(categories, id: \.category) { c in
                 HStack {
                     HStack(spacing: 8) {
                         Circle().fill(Color(hexString: c.category.color)).frame(width: 8, height: 8)
