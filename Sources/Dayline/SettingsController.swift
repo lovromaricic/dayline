@@ -273,7 +273,7 @@ final class SettingsController {
         }
         [period, rows, rounding, format].forEach(box.addSubview)
         alert.accessoryView = box
-        alert.addButton(withTitle: "Export…")
+        alert.addButton(withTitle: "Export")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 

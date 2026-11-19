@@ -485,14 +485,14 @@ struct ProjectsPage: View {
                 Text(clientTotal(c, projects, total)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.textFaint)
                 Spacer()
                 if let c {
-                    Button("Export…") { vm.onExportClient?(c) }
+                    Button("Export") { vm.onExportClient?(c) }
                         .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
                         .disabled(projects.isEmpty)
                     Menu {
-                        Button("Rename…") { rename(c) }
-                        Button(c.rate == nil ? "Set rate…" : "Edit rate…") { vm.onEditClientRate?(c) }
+                        Button("Rename") { rename(c) }
+                        Button(c.rate == nil ? "Set rate" : "Edit rate") { vm.onEditClientRate?(c) }
                         Divider()
-                        Button("Delete client…") { vm.onDeleteClient?(c) }
+                        Button("Delete client") { vm.onDeleteClient?(c) }
                     } label: {
                         Image(systemName: "ellipsis").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
                             .frame(width: 24, height: 20).contentShape(Rectangle())
@@ -633,7 +633,7 @@ private struct ProjectPanel: View {
             }
             Spacer()
             VStack(alignment: .leading, spacing: 10) {
-                Button("Export hours…") { vm.onExportProject?(project) }
+                Button("Export hours") { vm.onExportProject?(project) }
                     .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                 Menu {
                     Button("No client") { vm.onMoveProject?(project, nil) }.disabled(project.clientID == nil)
@@ -642,18 +642,18 @@ private struct ProjectPanel: View {
                         Button(c.name) { vm.onMoveProject?(project, c) }.disabled(c.id == project.clientID)
                     }
                 } label: {
-                    Text("Move to client…").font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                    Text("Move to client").font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                 }
                 .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
                 Button(project.isArchived ? "Unarchive" : "Archive") { vm.onArchiveProject?(project, !project.isArchived) }
                     .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                     .help(project.isArchived ? "Back in the pickers; its auto-adds add new work again"
                           : "Hides it from pickers and stops its auto-adds; its past time stays")
-                Button("Rename…") {
+                Button("Rename") {
                     if let n = askName("Rename project", project.name) { vm.onRenameProject?(project.id, n) }
                 }
                 .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
-                Button("Delete project…") { vm.onDeleteProject?(project) }
+                Button("Delete project") { vm.onDeleteProject?(project) }
                     .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.danger)
             }
         }

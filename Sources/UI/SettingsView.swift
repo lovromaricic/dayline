@@ -325,12 +325,12 @@ private struct CategoriesPage: View {
     }
 
     @ViewBuilder private func chipMenu(_ c: ActivityCategory) -> some View {
-        Button("Rename…") { renameText = c.name; renaming = c.id }
+        Button("Rename") { renameText = c.name; renaming = c.id }
         Menu("Color") {
             ColorChoices(selected: c.color) { hex in var u = c; u.color = hex; vm.onUpdateCategory?(u) }
         }
         Divider()
-        Button("Delete…") { vm.onDeleteCategory?(c) }
+        Button("Delete") { vm.onDeleteCategory?(c) }
     }
 
     private func chipEditor(text: Binding<String>, color: String, colorPicker: Bool = false,
@@ -543,7 +543,7 @@ struct CategoryPicker: View {
             ForEach(categories) { c in Button(c.name) { onPick(c) } }
             if let onNew {
                 Divider()
-                Button("New category…", action: onNew)
+                Button("New category", action: onNew)
             }
             if let onNeverTrack {
                 Button("Never track", action: onNeverTrack)
