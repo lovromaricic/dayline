@@ -33,9 +33,23 @@ struct BlocksList: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .focused(searchFocus)
-                    .padding(.horizontal, 12)
+                    .padding(.leading, 12)
+                    .padding(.trailing, vm.search.isEmpty ? 12 : 30)
                     .frame(width: 200, height: 32)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Theme.railFill))
+                    // ⓧ clears, like a Mac search field; only while there's text.
+                    .overlay(alignment: .trailing) {
+                        if !vm.search.isEmpty {
+                            Button { vm.search = "" } label: {
+                                Image(systemName: "xmark.circle.fill").font(.system(size: 13))
+                                    .foregroundStyle(Theme.textFaint)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.trailing, 9)
+                            .help("Clear search")
+                            .accessibilityLabel("Clear search")
+                        }
+                    }
                     // The same focus ring as the Note field.
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(searchFocus.wrappedValue ? Theme.textFaint : .clear))
                     .accessibilityLabel("Search blocks by title, app, site or note")
