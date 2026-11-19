@@ -47,6 +47,13 @@ public final class SettingsViewModel: ObservableObject {
     @Published public var startAtLogin = false
     @Published public var startAtLoginError: String?
     @Published public var showTotal = true
+    /// "Break reminder" and its "Remind me after" minutes.
+    @Published public var breakReminder = false
+    @Published public var breakMinutes = 60
+    public var breakChoices = [30, 45, 60, 90]
+    public var onSetBreakReminder: ((Bool) -> Void)?
+    public var onSetBreakMinutes: ((Int) -> Void)?
+
     /// End-of-day recap hour; nil is off.
     @Published public var recapHour: Int?
     public var recapHours = [17, 18, 19, 20]

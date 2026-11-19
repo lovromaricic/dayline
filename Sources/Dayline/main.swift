@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var timeline: TimelineWindowController!
     private var settings: SettingsController!
     private var recap: Recap!
+    private var breaks: Breaks!
 
     func applicationDidFinishLaunching(_ note: Notification) {
         let database: DaylineDatabase
@@ -61,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settings?.refresh()
         }
         recap = Recap(engine: engine)
+        breaks = Breaks(engine: engine)
         recap.checkPermission()
         recap.onOpenDay = { [weak self] day in
             self?.statusItem.closePopover()
@@ -97,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let report = DayReport(segments: segments, dayStart: dayStart, now: now, resolve: { categorizer.resolve($0) })
         let summary = DaySummary(report: engine.hidesTitlesNow ? report.hidingTitles() : report)
         recap.check(report: report, now: now)
+        breaks.check(segments: segments, now: now)
         let model = PopoverModel(phase: engine.phase, summary: summary, nowStatus: engine.nowStatus, now: now)
         if model != popoverModel.model {
             if animated, statusItem.isPopoverShown, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {

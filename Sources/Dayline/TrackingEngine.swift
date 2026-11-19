@@ -72,6 +72,20 @@ final class TrackingEngine {
         set { try? database.setSetting("recap.lastDay", newValue.map(String.init)) }
     }
 
+    /// "Break reminder": off by default.
+    var breakReminder: Bool {
+        get { flag("break.on", default: false) }
+        set { setFlag("break.on", newValue) }
+    }
+
+    /// "Remind me after", in minutes; kept while the reminder is off.
+    var breakMinutes: Int {
+        get { (try? database.setting("break.minutes")).flatMap { $0.flatMap(Int.init) } ?? 60 }
+        set { try? database.setSetting("break.minutes", String(newValue)) }
+    }
+
+    var inCall: Bool { calls.state.inCall }
+
     /// "Count calls as meetings": a call keeps you from going away and counts as Meetings.
     var callsActive: Bool {
         get { flag("calls.active", default: true) }

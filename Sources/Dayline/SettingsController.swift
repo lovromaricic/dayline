@@ -48,6 +48,13 @@ final class SettingsController {
             self?.reload()
         }
         viewModel.onSetShowTotal = { [weak self] on in engine.showTotalInMenuBar = on; self?.reload() }
+        viewModel.breakChoices = BreakReminder.choices
+        viewModel.onSetBreakReminder = { [weak self] on in
+            engine.breakReminder = on
+            if on { Recap.requestPermission() }
+            self?.reload()
+        }
+        viewModel.onSetBreakMinutes = { [weak self] m in engine.breakMinutes = m; self?.reload() }
         viewModel.recapHours = TrackingEngine.recapHours
         viewModel.onSetRecapHour = { [weak self] hour in
             engine.recapHour = hour
@@ -196,6 +203,8 @@ final class SettingsController {
         viewModel.startAtLogin = LoginItem.isOn
         viewModel.showTotal = engine.showTotalInMenuBar
         viewModel.recapHour = engine.recapHour
+        viewModel.breakReminder = engine.breakReminder
+        viewModel.breakMinutes = engine.breakMinutes
         viewModel.idleMinutes = engine.idleMinutes
         viewModel.callsActive = engine.callsActive
         viewModel.chromeTitles = engine.readChromeTitles

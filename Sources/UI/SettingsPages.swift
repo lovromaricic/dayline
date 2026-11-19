@@ -109,6 +109,17 @@ struct GeneralPage: View {
                         }
                     }
                 }
+                group("BREAKS") {
+                    SettingRow(title: "Break reminder",
+                               subtitle: "A notification when you’ve worked a while without stepping away. Never during calls.", first: true) {
+                        toggle("Break reminder", vm.breakReminder, vm.onSetBreakReminder)
+                    }
+                    if vm.breakReminder {
+                        SettingRow(title: "Remind me after", subtitle: "Time at your Mac without a break. Stepping away resets it.") {
+                            select(minutesLabel(vm.breakMinutes), options: vm.breakChoices, label: minutesLabel) { vm.onSetBreakMinutes?($0) }
+                        }
+                    }
+                }
                 group("TRACKING") {
                     SettingRow(title: "Count me as away after", subtitle: "No keyboard or mouse activity for this long pauses the clock.",
                                first: true) {
