@@ -254,6 +254,10 @@ public final class HomeViewModel: ObservableObject {
     public var onProjectAlways: ((ProjectCorrection) -> Void)?
     /// "See Krediti's rules": Settings → Projects with that project open.
     public var onShowProject: ((Project) -> Void)?
+    /// "Stop": the rule that put a block in its project is removed.
+    public var onStopProjectRule: ((ProjectRule) -> Void)?
+
+    public func stopProjectRule(_ rule: ProjectRule) { onStopProjectRule?(rule) }
 
     public func setProject(_ block: Block, _ project: Project?) {
         guard project != block.project || block.projectRule != nil else { return }

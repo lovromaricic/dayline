@@ -181,12 +181,18 @@ struct Inspector: View {
             .accessibilityLabel("Project, \(b.project?.fullName ?? "none")")
             // Why it is there, so a wrong guess can be traced and fixed.
             if let rule = b.projectRule, let p = b.project, vm.pendingProjectRule?.blockID != b.id {
-                Button { vm.onShowProject?(p) } label: {
-                    (Text("Because of “\(rule.pattern)” · ") + Text("See \(p.name)’s rules").foregroundColor(Theme.textSecondary))
-                        .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
-                        .lineLimit(2).multilineTextAlignment(.leading)
+                HStack(spacing: 4) {
+                    Text("Always goes to \(p.name) ·").foregroundStyle(Theme.textMuted)
+                        .help("Your rule: “\(rule.pattern)” goes to \(p.name)")
+                    Button("Remove") { vm.stopProjectRule(rule) }
+                        .buttonStyle(.plain).foregroundStyle(Theme.textSecondary)
+                        .help("Remove this rule. What it added goes back to no project.")
                 }
-                .buttonStyle(.plain)
+                .font(.system(size: 12))
+                .lineLimit(1)
+                Button("See \(p.name)’s rules") { vm.onShowProject?(p) }
+                    .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                    .padding(.top, -6)
             }
         }
     }

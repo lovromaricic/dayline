@@ -37,6 +37,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onMoveDay = { [weak self] days in self?.move(days: days) }
         viewModel.onSortUnsorted = { [weak self] in self?.onSortUnsorted?() }
         viewModel.onShowProject = { [weak self] p in self?.onShowProject?(p) }
+        viewModel.onStopProjectRule = { [weak self] rule in self?.stopProjectRule(rule) }
         viewModel.onPickDay = { [weak self] date in self?.show(day: Self.startOfDay(date)) }
         viewModel.onSetPeriod = { [weak self] _ in self?.reload(); self?.viewModel.replay += 1 }
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
@@ -130,6 +131,16 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         } catch {
             Log.line("project failed: \(error)")
         }
+        reload()
+    }
+
+    private func stopProjectRule(_ rule: ProjectRule) {
+        do {
+            try engine.database.deleteProjectRule(id: rule.id)
+        } catch {
+            Log.line("stop project rule failed: \(error)")
+        }
+        engine.reloadCategories()
         reload()
     }
 
