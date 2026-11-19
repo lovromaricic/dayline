@@ -36,6 +36,8 @@ struct BlocksList: View {
                     .padding(.horizontal, 12)
                     .frame(width: 200, height: 32)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Theme.railFill))
+                    // The same focus ring as the Note field.
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(searchFocus.wrappedValue ? Theme.textFaint : .clear))
                     .accessibilityLabel("Search blocks by title, app, site or note")
                     .onExitCommand { vm.search = ""; searchFocus.wrappedValue = false }
                 // Always there, so the search field doesn't jump when you type.
