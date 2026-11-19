@@ -51,9 +51,12 @@ Dayline is not notarized. If you download a build instead of building it, macOS 
 
 - **Menu bar:** the ring fills toward 8 hours of tracked time. Click for today's summary, ⌥-click to pause or resume, right-click for pause lengths, Open timeline and Quit.
 - **Timeline** (Open timeline in the popover, or right-click the menu bar item): a one-line summary of the day, lanes per category, the blocks list and an inspector. Select a block to change its category; Dayline offers to remember it as a rule. Drag a bar to another lane for the same thing. ←/→ moves between days, ↑/↓ through blocks, ⌘F searches. Every number adds up: blocks to their category, categories to the day's total.
-- **Week:** the Day/Week switch shows each day of the week split by category, with the week's total and average.
+- **Week and Month:** the Day/Week/Month switch shows each day split by category, with the total and average. Month is a calendar of the whole month.
+- **Search:** ⌘F searches the day's blocks by title, app, site, note or project. Switch to All days to search back through earlier months.
+- **Projects and clients:** put a block in a project from the inspector or by right-clicking it. Dayline offers to always send that title, site or app to the project (an auto-add). The By project tab and the header filter show time per client or project. Give a client or project an hourly rate, and export hours by day, week, month or block to Excel or CSV for invoicing. Finished projects can be archived.
+- **Break reminder:** an optional nudge to stand up and walk or stretch after a set time of work, skipped during calls.
 - **Calls:** while a mic or camera is in use you stay tracked even without typing, and apps with no category of their own count as Meetings.
-- **Settings** (⌘,): start at login, the away threshold, calls, browser tab titles, an optional end-of-day recap notification, categories and rules (with a list of apps and sites that still need a category), never-track list, history length, export (CSV, JSON) and delete all.
+- **Settings** (⌘,): start at login, the away threshold, calls, browser tab titles, an optional end-of-day recap notification, categories and rules (with a list of apps and sites that still need a category), projects and clients, the break reminder, never-track list, history length, export (CSV, JSON) and delete all.
 
 ## Data
 
