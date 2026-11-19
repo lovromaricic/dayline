@@ -112,6 +112,10 @@ public final class DaylineDatabase {
                 ALTER TABLE project ADD COLUMN rate REAL;
                 """)
         }
+        m.registerMigration("v7-archive") { db in
+            // A finished project: hidden from pickers, its past time kept.
+            try db.execute(sql: "ALTER TABLE project ADD COLUMN archived_at INTEGER")
+        }
         return m
     }
 

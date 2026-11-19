@@ -16,13 +16,14 @@ extension DaylineDatabase {
     public func projects() throws -> [Project] {
         try pool.read { db in
             try Row.fetchAll(db, sql: """
-                SELECT p.id, p.name, p.client_id, p.rate, c.name AS client_name, c.rate AS client_rate,
+                SELECT p.id, p.name, p.client_id, p.rate, p.archived_at, c.name AS client_name, c.rate AS client_rate,
                        c.currency AS client_currency FROM project p
                 LEFT JOIN client c ON c.id = p.client_id
                 ORDER BY c.name IS NULL, c.name COLLATE NOCASE, p.name COLLATE NOCASE, p.id
                 """).map {
                 Project(id: $0["id"], name: $0["name"], clientID: $0["client_id"], clientName: $0["client_name"],
-                        rate: $0["rate"], clientRate: $0["client_rate"], clientCurrency: $0["client_currency"])
+                        rate: $0["rate"], clientRate: $0["client_rate"], clientCurrency: $0["client_currency"],
+                        archivedAt: $0["archived_at"])
             }
         }
     }
@@ -74,6 +75,11 @@ extension DaylineDatabase {
 
     public func renameProject(id: Int64, name: String) throws {
         try pool.write { try $0.execute(sql: "UPDATE project SET name = ? WHERE id = ?", arguments: [name, id]) }
+    }
+
+    /// nil brings it back.
+    public func setProjectArchived(id: Int64, at: Int64?) throws {
+        try pool.write { try $0.execute(sql: "UPDATE project SET archived_at = ? WHERE id = ?", arguments: [at, id]) }
     }
 
     public func setProjectClient(id: Int64, clientID: Int64?) throws {

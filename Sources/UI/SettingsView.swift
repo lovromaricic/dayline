@@ -120,6 +120,9 @@ public final class SettingsViewModel: ObservableObject {
     public var onDeleteProject: ((Project) -> Void)?
     public var onDeleteClient: ((Client) -> Void)?
     public var onDeleteProjectRule: ((Int64) -> Void)?
+    public var onArchiveProject: ((Project, Bool) -> Void)?
+    /// nil moves it to No client.
+    public var onMoveProject: ((Project, Client?) -> Void)?
     /// The app asks for the rate and currency.
     public var onEditClientRate: ((Client) -> Void)?
     public var onEditProjectRate: ((Project) -> Void)?

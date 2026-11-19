@@ -33,9 +33,11 @@ public struct Project: Equatable, Hashable, Identifiable, Sendable {
     public var clientRate: Double?
     /// The client's currency; nil is your Mac's.
     public var clientCurrency: String?
+    /// Finished: hidden from pickers, and its rules stop adding new work.
+    public var archivedAt: Int64?
 
     public init(id: Int64, name: String, clientID: Int64? = nil, clientName: String? = nil,
-                rate: Double? = nil, clientRate: Double? = nil, clientCurrency: String? = nil) {
+                rate: Double? = nil, clientRate: Double? = nil, clientCurrency: String? = nil, archivedAt: Int64? = nil) {
         self.id = id
         self.name = name
         self.clientID = clientID
@@ -43,7 +45,10 @@ public struct Project: Equatable, Hashable, Identifiable, Sendable {
         self.rate = rate
         self.clientRate = clientRate
         self.clientCurrency = clientCurrency
+        self.archivedAt = archivedAt
     }
+
+    public var isArchived: Bool { archivedAt != nil }
 
     /// What an hour costs: its own rate, else its client's; nil shows hours only.
     public var hourlyRate: Double? { rate ?? clientRate }
@@ -81,8 +86,10 @@ public struct ProjectResolver: Sendable {
     public static let none: Int64 = 0
 
     public private(set) var projects: [Int64: Project] = [:]
-    /// In display order (grouped by client), for pickers.
+    /// In display order (grouped by client), archived ones included.
     public private(set) var list: [Project] = []
+    /// What pickers offer: not archived.
+    public var active: [Project] { list.filter { !$0.isArchived } }
     /// Newest first.
     public private(set) var rules: [ProjectRule] = []
 
@@ -100,7 +107,10 @@ public struct ProjectResolver: Sendable {
         if !ignoringManual, let id = s.manualProjectID {
             return projects[id].map { ($0, nil) }
         }
-        guard let rule = rules.first(where: { $0.matches(s) }), let p = projects[rule.projectID] else { return nil }
+        // An archived project keeps what its rules caught before, and nothing after.
+        guard let rule = rules.first(where: { r in
+            r.matches(s) && (projects[r.projectID]?.archivedAt).map { s.start < $0 } ?? true
+        }), let p = projects[rule.projectID] else { return nil }
         return (p, rule)
     }
 }

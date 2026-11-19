@@ -32,4 +32,13 @@ import Testing
         let b2 = DayReport(segments: segs2, dayStart: 0, now: 700) { _ in .design }.withProjects(r, segments: segs2).blocks
         #expect(b2[0].project == nil)
     }
+
+    @Test func anArchivedProjectKeepsItsPastButAddsNothingNew() {
+        var old = krediti
+        old.archivedAt = 100
+        let r = ProjectResolver(projects: [old], rules: [ProjectRule(id: 1, projectID: 1, kind: .titleContains, pattern: "kreditni", createdAt: 1)])
+        #expect(r.resolve(seg(1, 50, 90, "Kreditni limiti"))?.project.id == 1)
+        #expect(r.resolve(seg(2, 150, 200, "Kreditni limiti")) == nil)
+        #expect(r.active.isEmpty)
+    }
 }

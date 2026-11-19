@@ -305,7 +305,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         segments = (try? engine.store.segments(from: dayStart, to: next)) ?? []
         let categorizer = engine.categorizer
         if viewModel.categories != categorizer.categoryList { viewModel.categories = categorizer.categoryList }
-        if viewModel.projects != engine.projects.list { viewModel.projects = engine.projects.list }
+        if viewModel.projects != engine.projects.active { viewModel.projects = engine.projects.active }
         if viewModel.projects.isEmpty {
             if viewModel.scope != nil { viewModel.setScope(nil); return }
             if viewModel.mode == .byProject { viewModel.mode = .byCategory }

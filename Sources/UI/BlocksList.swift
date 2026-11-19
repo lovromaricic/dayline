@@ -135,6 +135,43 @@ struct BlocksList: View {
         }
     }
 
+    /// Right-click: move a block without opening the inspector.
+    @ViewBuilder
+    private func blockMenu(_ b: Block) -> some View {
+        if !vm.projects.isEmpty {
+            Menu("Move to project") {
+                Button { vm.setProject(b, nil) } label: {
+                    if b.project == nil { Label("No project", systemImage: "checkmark") } else { Text("No project") }
+                }
+                ForEach(projectGroups, id: \.0) { client, projects in
+                    Divider()
+                    Section(client ?? "No client") {
+                        ForEach(projects) { p in
+                            Button { vm.setProject(b, p) } label: {
+                                if p == b.project { Label(p.name, systemImage: "checkmark") } else { Text(p.name) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Menu("Change category") {
+            ForEach(vm.categories) { c in
+                Button { vm.setCategory(b, c) } label: {
+                    if c == b.category { Label(c.name, systemImage: "checkmark") } else { Text(c.name) }
+                }
+            }
+        }
+    }
+
+    private var projectGroups: [(String?, [Project])] {
+        var groups: [(String?, [Project])] = []
+        for p in vm.projects {
+            if let i = groups.firstIndex(where: { $0.0 == p.clientName }) { groups[i].1.append(p) } else { groups.append((p.clientName, [p])) }
+        }
+        return groups
+    }
+
     // MARK: - This day
 
     private var dayRows: some View {
@@ -152,6 +189,7 @@ struct BlocksList: View {
                              alsoMinutes: vm.callMinutes(b),
                              hideTopBorder: vm.selection == b.id || (i > 0 && vm.selection == rows[i - 1].id))
                         .onTapGesture { vm.select(vm.selection == b.id ? nil : b.id) }
+                        .contextMenu { blockMenu(b) }
                         .accessibilityAction { vm.select(vm.selection == b.id ? nil : b.id) }
                         .accessibilityHint(vm.selection == b.id ? "Deselects the block" : "Shows the block in the inspector")
                         // Chart bars carry the block id too; the row's own id keeps

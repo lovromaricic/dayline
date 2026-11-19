@@ -347,16 +347,17 @@ struct ProjectsPage: View {
                         }
                     }
                     if let adding { form(adding) }
-                    if vm.projects.isEmpty && adding == nil {
+                    if active.isEmpty && adding == nil {
                         empty
                     }
                     ForEach(groups, id: \.0) { client, projects in
                         clientGroup(client, projects)
                     }
                     // Clients without projects yet still show, so you can add to them.
-                    ForEach(vm.clients.filter { c in !vm.projects.contains { $0.clientID == c.id } }) { c in
+                    ForEach(vm.clients.filter { c in !active.contains { $0.clientID == c.id } }) { c in
                         clientGroup(c, [])
                     }
+                    if !archived.isEmpty { archivedSection }
                 }
                 .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32).darkScroller()
             }
@@ -366,9 +367,38 @@ struct ProjectsPage: View {
         }
     }
 
+    private var active: [Project] { vm.projects.filter { !$0.isArchived } }
+    private var archived: [Project] { vm.projects.filter(\.isArchived) }
+
+    /// Finished projects: out of the pickers, totals kept for past invoices.
+    private var archivedSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Text("ARCHIVED · \(archived.count)").eyebrow()
+                Text("Hidden from pickers. Their past time still counts.").font(.system(size: 12)).foregroundStyle(Theme.textFaint)
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(archived.enumerated()), id: \.element.id) { i, p in
+                    HStack(spacing: 16) {
+                        Button { vm.openProject = vm.openProject == p.id ? nil : p.id } label: {
+                            Text(p.fullName).font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                                .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        Button("Unarchive") { vm.onArchiveProject?(p, false) }
+                            .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                    }
+                    .padding(.horizontal, 18).frame(height: 40)
+                    .overlay(alignment: .top) { Rectangle().fill(i == 0 ? .clear : Theme.border).frame(height: 1) }
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border.opacity(0.7)))
+        }
+    }
+
     private var groups: [(Client?, [Project])] {
         var out: [(Client?, [Project])] = []
-        for p in vm.projects {
+        for p in active {
             let c = p.clientID.flatMap { id in vm.clients.first { $0.id == id } }
             if let i = out.firstIndex(where: { $0.0?.id == c?.id }) { out[i].1.append(p) } else { out.append((c, [p])) }
         }
@@ -605,6 +635,20 @@ private struct ProjectPanel: View {
             VStack(alignment: .leading, spacing: 10) {
                 Button("Export hours…") { vm.onExportProject?(project) }
                     .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                Menu {
+                    Button("No client") { vm.onMoveProject?(project, nil) }.disabled(project.clientID == nil)
+                    Divider()
+                    ForEach(vm.clients) { c in
+                        Button(c.name) { vm.onMoveProject?(project, c) }.disabled(c.id == project.clientID)
+                    }
+                } label: {
+                    Text("Move to client…").font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                }
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                Button(project.isArchived ? "Unarchive" : "Archive") { vm.onArchiveProject?(project, !project.isArchived) }
+                    .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                    .help(project.isArchived ? "Back in the pickers; its rules add new work again"
+                          : "Hides it from pickers and stops its rules; its past time stays")
                 Button("Rename…") {
                     if let n = askName("Rename project", project.name) { vm.onRenameProject?(project.id, n) }
                 }

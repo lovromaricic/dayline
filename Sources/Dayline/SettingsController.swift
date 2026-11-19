@@ -59,6 +59,10 @@ final class SettingsController {
             viewModel.openProject = nil
             write { try db.deleteProject(id: p.id) }
         }
+        viewModel.onArchiveProject = { [weak self] p, archive in
+            self?.write { try db.setProjectArchived(id: p.id, at: archive ? TrackingEngine.now() : nil) }
+        }
+        viewModel.onMoveProject = { [weak self] p, c in self?.write { try db.setProjectClient(id: p.id, clientID: c?.id) } }
         viewModel.onEditClientRate = { [weak self] c in
             guard let self, let (rate, currency) = askRate("Hourly rate for \(c.name)",
                                                          "Used for all its projects unless one has its own. Leave empty for hours only.",
