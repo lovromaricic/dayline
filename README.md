@@ -10,6 +10,12 @@ Everything stays on your Mac in one SQLite file. Dayline has no account and make
 |---|---|
 | ![The week view: each day split by category](docs/screenshots/week.png) | <img src="docs/screenshots/popover.png" alt="The popover: today's total, what you are in now and the top categories" width="320"> |
 
+![The month view: a calendar of the month, each day split by category](docs/screenshots/month.png)
+
+| By project | Projects and clients |
+|---|---|
+| ![The day by project: a lane per client and project](docs/screenshots/by-project.png) | ![Settings → Projects: hours and amounts per client and project, auto-adds and Export hours](docs/screenshots/projects.png) |
+
 ![Settings: categories, apps and sites that need a category, your rules and the never-track list](docs/screenshots/settings.png)
 
 ## What it sees, and what it never sees

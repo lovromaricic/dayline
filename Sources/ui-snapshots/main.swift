@@ -146,10 +146,10 @@ let selectedVM = HomeViewModel(report: correctedReport)
 let corrected = correctedReport.blocks.first { $0.host == "developer.apple.com" }!
 selectedVM.selection = corrected.id
 selectedVM.pendingCorrection = Correction.subject(for: corrected, category: .development)
-// Projects: Onboarding blocks belong to Erste · Krediti by a rule; one is selected
+// Projects: Onboarding blocks belong to Acme · Onboarding by a rule; one is selected
 // right after picking it by hand, with the Always prompt.
-let krediti = Project(id: 1, name: "Krediti", clientID: 1, clientName: "Erste")
-let georgeApp = Project(id: 2, name: "George app", clientID: 1, clientName: "Erste")
+let krediti = Project(id: 1, name: "Onboarding", clientID: 1, clientName: "Acme", clientRate: 60, clientCurrency: "EUR")
+let georgeApp = Project(id: 2, name: "Mobile app", clientID: 1, clientName: "Acme", clientRate: 60, clientCurrency: "EUR")
 let projectRule = ProjectRule(id: 1, projectID: 1, kind: .titleContains, pattern: "Onboarding", createdAt: at(9, 0))
 let projectReport = homeReport.withProjects(ProjectResolver(projects: [krediti, georgeApp], rules: [projectRule]), segments: homeDay)
 let projectVM = HomeViewModel(report: projectReport)
@@ -160,7 +160,7 @@ projectVM.pendingProjectRule = ProjectCorrection(blockID: pickedBlock.id, kind: 
 let ruleVM = HomeViewModel(report: projectReport)
 ruleVM.projects = [krediti, georgeApp]
 ruleVM.selection = projectReport.blocks.first { $0.title == "Onboarding – Figma" }!.id
-// By project lanes, then the same day narrowed to Erste.
+// By project lanes, then the same day narrowed to Acme.
 let byProjectVM = HomeViewModel(report: projectReport)
 byProjectVM.projects = [krediti, georgeApp]
 byProjectVM.mode = .byProject
@@ -170,7 +170,7 @@ let scopedVM = HomeViewModel(report: DayReport(segments: ersteDay, dayStart: day
     .withProjects(ersteResolver, segments: ersteDay))
 scopedVM.projects = [krediti, georgeApp]
 scopedVM.mode = .byProject
-scopedVM.setScope(.client(Client(id: 1, name: "Erste")))
+scopedVM.setScope(.client(Client(id: 1, name: "Acme", currency: "EUR", rate: 60)))
 scopedVM.unscopedTracked = homeReport.tracked
 func vm(_ report: DayReport, _ phase: TrackingPhase, granted: Bool = false) -> HomeViewModel {
     let v = HomeViewModel(report: report)
@@ -330,9 +330,9 @@ MainActor.assumeIsolated {
     s.titlesOnScreen = .calls
     s.storageText = "4.2 MB since 9 Nov"
     s.builtins = BuiltinRules.all.map { BuiltinRuleRow(kind: $0.kind, label: $0.label, category: $0.category) }
-    s.clients = [Client(id: 1, name: "Erste"), Client(id: 2, name: "Infobip")]
-    s.projects = [krediti, georgeApp, Project(id: 3, name: "Website", clientID: 2, clientName: "Infobip"), Project(id: 4, name: "Dayline")]
-    s.projectRules = [projectRule, ProjectRule(id: 2, projectID: 1, kind: .titleContains, pattern: "kreditni", createdAt: at(8, 0))]
+    s.clients = [Client(id: 1, name: "Acme", currency: "EUR", rate: 60), Client(id: 2, name: "Northwind")]
+    s.projects = [krediti, georgeApp, Project(id: 3, name: "Website", clientID: 2, clientName: "Northwind"), Project(id: 4, name: "Dayline")]
+    s.projectRules = [projectRule, ProjectRule(id: 2, projectID: 1, kind: .titleContains, pattern: "Signup flow", createdAt: at(8, 0))]
     s.projectMonth = [1: 22 * 3600 + 600, 2: 12 * 3600 + 600, 3: 6 * 3600 + 1800, 4: 6 * 3600 + 3000]
     s.openProject = 1
     for (name, section, height) in [("settings-categories-unsorted", SettingsSection.categories, 1000.0),
@@ -356,7 +356,7 @@ MainActor.assumeIsolated {
     // The day with a block selected, without the "Always categorize" prompt.
     let readmeDay = HomeViewModel(report: correctedReport)
     readmeDay.selection = corrected.id
-    for (name, vm) in [("readme-day", readmeDay), ("readme-week", weekVM)] {
+    for (name, vm) in [("readme-day", readmeDay), ("readme-week", weekVM), ("readme-month", monthVM), ("readme-by-project", byProjectVM)] {
         let host = NSHostingView(rootView: HomeView(viewModel: vm).frame(width: 1200, height: 716))
         let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: 716), styleMask: [.borderless], backing: .buffered, defer: false)
         win.contentView = host
