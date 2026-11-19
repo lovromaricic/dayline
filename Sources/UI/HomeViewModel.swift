@@ -46,6 +46,20 @@ public struct Correction: Equatable, Sendable {
     }
 }
 
+/// A day in an All days search, with its matching blocks, newest first.
+public struct SearchDay: Equatable, Sendable {
+    public var dayStart: Int64
+    public var isToday: Bool
+    public var blocks: [Block]
+    public var total: Int64 { blocks.reduce(0) { $0 + $1.duration } }
+
+    public init(dayStart: Int64, isToday: Bool, blocks: [Block]) {
+        self.dayStart = dayStart
+        self.isToday = isToday
+        self.blocks = blocks
+    }
+}
+
 /// State of the main window. The app sets `report`; the view owns the rest.
 public final class HomeViewModel: ObservableObject {
     @Published public var report: DayReport
@@ -54,8 +68,15 @@ public final class HomeViewModel: ObservableObject {
     @Published public var week: WeekReport?
     @Published public var selection: Int64?
     @Published public var mode = TimelineMode.byCategory
-    @Published public var search = ""
-    @Published public var categoryFilter: ActivityCategory?
+    @Published public var search = "" { didSet { if search != oldValue { searchEverywhere() } } }
+    /// Search every saved day instead of the one shown.
+    @Published public var searchAllDays = false { didSet { if searchAllDays != oldValue { searchEverywhere() } } }
+    /// Set by the app for an All days search: matching blocks by day, newest
+    /// first, from the newest month with a match back to the months loaded.
+    @Published public var allDaysResults: [SearchDay]?
+    /// The next older month with a match, for "Show October"; nil when there is none.
+    @Published public var allDaysOlder: Int64?
+    @Published public var categoryFilter: ActivityCategory? { didSet { if categoryFilter != oldValue { searchEverywhere() } } }
     @Published public var showAllBlocks = false
     @Published public var showAllLanes = false
     /// All categories, for the inspector's select.
@@ -99,6 +120,50 @@ public final class HomeViewModel: ObservableObject {
     public var onSplitCall: ((Block) -> Void)?
     /// A split call counts as one Meetings block again.
     public var onWholeCall: ((DayReport.Call) -> Void)?
+
+    /// All days: the app finds the matching days and sets `allDaysResults`.
+    public var onSearchAllDays: ((String) -> Void)?
+    /// Adds the next older month with a match to the results.
+    public var onShowOlderMonth: (() -> Void)?
+
+    public func showOlderMonth() { onShowOlderMonth?() }
+
+    /// All days is on: blocks from every day, filtered by search and category if set.
+    public var isSearchingAllDays: Bool { searchAllDays }
+    private var query: String { search.trimmingCharacters(in: .whitespaces) }
+
+    private func searchEverywhere() {
+        guard isSearchingAllDays else {
+            allDaysResults = nil
+            allDaysOlder = nil
+            return
+        }
+        onSearchAllDays?(query)
+    }
+
+    /// The All days results under the category filter too.
+    public var allDaysVisible: [SearchDay] {
+        guard let days = allDaysResults else { return [] }
+        guard let c = categoryFilter else { return days }
+        return days.compactMap { d in
+            let blocks = d.blocks.filter { $0.category == c }
+            return blocks.isEmpty ? nil : SearchDay(dayStart: d.dayStart, isToday: d.isToday, blocks: blocks)
+        }
+    }
+
+    /// A result: open its day with the block selected.
+    public func openResult(_ day: SearchDay, _ block: Block) {
+        searchAllDays = false
+        search = ""
+        if period != .day { period = .day; onSetPeriod?(.day) }
+        onPickDay?(Date(timeIntervalSince1970: TimeInterval(day.dayStart)))
+        select(block.id)
+    }
+
+    /// What search looks at: title, app, site and your note.
+    public static func matches(_ b: Block, _ query: String) -> Bool {
+        query.isEmpty || [b.title, b.appName, b.host, b.note].contains { $0?.localizedCaseInsensitiveContains(query) ?? false }
+    }
 
     /// "Note": what you wrote on a block; empty removes it.
     public var onSetNote: ((Block, String) -> Void)?
@@ -190,10 +255,8 @@ public final class HomeViewModel: ObservableObject {
     /// Newest first, after search and category filter. A category also lists
     /// the calls you worked in it on.
     public var filteredBlocks: [Block] {
-        let q = search.trimmingCharacters(in: .whitespaces)
         return report.blocks.reversed().filter { b in
-            (categoryFilter == nil || b.category == categoryFilter || callMinutes(b) > 0)
-                && (q.isEmpty || [b.title, b.appName, b.host].contains { $0?.localizedCaseInsensitiveContains(q) ?? false })
+            (categoryFilter == nil || b.category == categoryFilter || callMinutes(b) > 0) && Self.matches(b, query)
         }
     }
 

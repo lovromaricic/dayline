@@ -113,6 +113,17 @@ import Testing
         #expect(try store.segments(from: 0, to: 100)[0].note == nil)
     }
 
+    @Test func searchFindsTitlesAndNotesAnyCase() throws {
+        let store = SegmentStore(database: try db())
+        try store.apply([.begin(SegmentDraft(start: 10, kind: .active, activity: Activity(appBundleID: "a", appName: "Figma", title: "Čarobni loan flow"))), .end(at: 20),
+                         .begin(SegmentDraft(start: 30, kind: .active, activity: Activity(appBundleID: "b", appName: "Slack"))), .end(at: 40),
+                         .begin(SegmentDraft(start: 50, kind: .active, activity: Activity(appBundleID: "c", appName: "Mail"))), .end(at: 60)])
+        try store.setNote(segmentIDs: [try store.segments(from: 0, to: 100)[1].id], note: "Loan review")
+        #expect(try store.starts(matching: "LOAN") == [30, 10])
+        #expect(try store.starts(matching: "čarobni") == [10])
+        #expect(try store.starts(matching: "nothing").isEmpty)
+    }
+
     @Test func newCategoryAndRename() throws {
         let d = try db()
         var c = try d.addCategory(name: "Admin", color: "#9B7CFF")

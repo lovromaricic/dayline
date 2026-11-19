@@ -54,6 +54,22 @@ public final class SegmentStore {
         }
     }
 
+    /// Starts of segments whose title, app, site or note contains `query`,
+    /// newest first, for search across days; every segment for an empty query.
+    /// Matched in Swift, so case is ignored for any letter (SQLite's LIKE only
+    /// folds ASCII).
+    public func starts(matching query: String) throws -> [Int64] {
+        try db.pool.read { db in
+            var found: [Int64] = []
+            let rows = try Row.fetchCursor(db, sql: "SELECT start, title, app_name, host, note FROM segment ORDER BY start DESC")
+            while let r = try rows.next() {
+                let fields: [String?] = [r["title"], r["app_name"], r["host"], r["note"]]
+                if query.isEmpty || fields.contains(where: { $0?.localizedCaseInsensitiveContains(query) ?? false }) { found.append(r["start"]) }
+            }
+            return found
+        }
+    }
+
     /// "Just this time": pin these segments to a category, or `nil` to undo.
     public func setManualCategory(segmentIDs: [Int64], categoryID: Int64?) throws {
         guard !segmentIDs.isEmpty else { return }

@@ -36,6 +36,9 @@ private struct ScrollerInstaller: NSViewRepresentable {
             super.viewDidMoveToWindow()
             guard let scroll = enclosingScrollView, !(scroll.verticalScroller is DarkScroller) else { return }
             scroll.verticalScroller = DarkScroller()
+            // Keep the scroller's width even when nothing scrolls, so the page
+            // doesn't widen and re-lay out when content gets short (a search).
+            scroll.autohidesScrollers = false
         }
     }
 }

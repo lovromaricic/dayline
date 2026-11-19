@@ -41,6 +41,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onSplitCall = { [weak self] block in self?.splitCall(block) }
         viewModel.onDeleteBlock = { [weak self] block in self?.deleteBlock(block) }
         viewModel.onSetNote = { [weak self] block, note in self?.setNote(block, note) }
+        viewModel.onSearchAllDays = { [weak self] query in self?.searchAllDays(query) }
+        viewModel.onShowOlderMonth = { [weak self] in self?.showOlderMonth() }
         viewModel.onWholeCall = { [weak self] call in self?.wholeCall(call) }
         viewModel.onOpenSystemSettings = { engine.openSystemSettings() }
         viewModel.onResume = { engine.resume() }
@@ -286,6 +288,71 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     }
 
     private var unsortedAt: Int64 = 0
+    private var pendingSearch: DispatchWorkItem?
+    /// All days search: the query, the days with a matching segment (newest
+    /// first), and the oldest month shown so far.
+    private var searchQuery = ""
+    private var matchDays: [Int64] = []
+    private var shownFrom: Int64 = 0
+
+    /// All days search starts with the newest month that has a match (this
+    /// month, if any). Waits for a pause in typing.
+    private func searchAllDays(_ query: String) {
+        pendingSearch?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.viewModel.isSearchingAllDays else { return }
+            let starts = (try? self.engine.store.starts(matching: query)) ?? []
+            var days: [Int64] = []
+            for s in starts {
+                let d = Self.startOfDay(Date(timeIntervalSince1970: TimeInterval(s)))
+                if days.last != d { days.append(d) }
+            }
+            self.searchQuery = query
+            self.matchDays = days
+            self.shownFrom = days.first.map(Self.startOfMonth) ?? 0
+            self.showSearchResults(untilAMatch: true)
+        }
+        pendingSearch = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
+    /// "Show October": back to the next older month with a match.
+    private func showOlderMonth() {
+        guard let older = matchDays.first(where: { $0 < shownFrom }) else { return }
+        let before = viewModel.allDaysVisible.count
+        shownFrom = Self.startOfMonth(older)
+        showSearchResults(untilAMatch: true, beyond: before)
+    }
+
+    /// The matching days from `shownFrom` on, each built as in the day view so
+    /// blocks merge the same way, keeping the blocks that match. `untilAMatch`:
+    /// a month with nothing in the chosen category is skipped, so the list
+    /// (or "Show October") always adds something.
+    private func showSearchResults(untilAMatch: Bool = false, beyond shown: Int = 0) {
+        let cal = Calendar.current
+        let today = Self.startOfDay(Date()), now = TrackingEngine.now()
+        let categorizer = engine.categorizer
+        let results = matchDays.filter { $0 >= shownFrom }.compactMap { day -> SearchDay? in
+            let next = Self.startOfDay(cal.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: TimeInterval(day)))!)
+            let segs = (try? engine.store.segments(from: day, to: next)) ?? []
+            var report = DayReport(segments: segs, dayStart: day, now: now, resolve: { categorizer.resolve($0) })
+            if engine.hidesTitlesNow { report = report.hidingTitles() }
+            let blocks = report.blocks.reversed().filter { HomeViewModel.matches($0, searchQuery) }
+            return blocks.isEmpty ? nil : SearchDay(dayStart: day, isToday: day == today, blocks: blocks)
+        }
+        let older = matchDays.first { $0 < shownFrom }.map(Self.startOfMonth)
+        if viewModel.allDaysResults != results { viewModel.allDaysResults = results }
+        if viewModel.allDaysOlder != older { viewModel.allDaysOlder = older }
+        if untilAMatch, viewModel.allDaysVisible.count <= shown, let next = matchDays.first(where: { $0 < shownFrom }) {
+            shownFrom = Self.startOfMonth(next)
+            showSearchResults(untilAMatch: true, beyond: shown)
+        }
+    }
+
+    private static func startOfMonth(_ day: Int64) -> Int64 {
+        let d = Date(timeIntervalSince1970: TimeInterval(day))
+        return Int64((Calendar.current.dateInterval(of: .month, for: d)?.start ?? d).timeIntervalSince1970)
+    }
     /// Past days of the week or month on screen; they don't change between ticks.
     private var pastDays: [Int64: DayReport] = [:]
 

@@ -190,6 +190,15 @@ let monthReports = monthStarts.enumerated().filter { $0.element <= dayStart }.co
 let monthVM = HomeViewModel(report: homeReport)
 monthVM.setPeriod(.month)
 monthVM.week = WeekReport(weekStart: monthStarts[0], reports: monthReports, dayStarts: monthStarts, today: dayStart, isMonth: true)
+// All days search: "onboarding" across the sample week.
+let searchAllVM = HomeViewModel(report: homeReport)
+searchAllVM.search = "onboarding"
+searchAllVM.searchAllDays = true
+searchAllVM.allDaysOlder = Int64(cal.date(byAdding: .month, value: -1, to: Date(timeIntervalSince1970: TimeInterval(monthStart)))!.timeIntervalSince1970)
+searchAllVM.allDaysResults = weekReports.reversed().map { r in
+    SearchDay(dayStart: r.dayStart, isToday: r.dayStart == dayStart,
+              blocks: r.blocks.reversed().filter { HomeViewModel.matches($0, "onboarding") })
+}
 let unsortedVM = HomeViewModel(report: homeReport)
 unsortedVM.unsortedCount = 3
 unsortedVM.unsortedTotal = 3 * 3600 + 27 * 60
@@ -243,6 +252,7 @@ let homes: [(String, HomeViewModel)] = [
     ("home-10-unsorted", unsortedVM),
     ("home-09-week", weekVM),
     ("home-09-month", monthVM),
+    ("home-10-search-all-days", searchAllVM),
     ("home-08-filtered", filteredVM),
     ("home-01-selected", selectedVM),
     ("home-02-nothing-selected", HomeViewModel(report: homeReport)),

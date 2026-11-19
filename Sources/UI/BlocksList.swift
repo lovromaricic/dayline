@@ -13,7 +13,7 @@ struct BlocksList: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 16) {
                 Text(title).eyebrow()
-                if vm.isFiltering, let total = filteredTotal {
+                if !vm.isSearchingAllDays, vm.isFiltering, let total = filteredTotal {
                     // The time those blocks add up to, brighter than the eyebrow.
                     (Text("· ").foregroundColor(Theme.textMuted) + Text(Durations.format(total)).foregroundColor(Theme.text))
                         .font(.system(size: 12, weight: .medium).monospacedDigit())
@@ -36,13 +36,16 @@ struct BlocksList: View {
                     .padding(.horizontal, 12)
                     .frame(width: 200, height: 32)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Theme.railFill))
-                    .accessibilityLabel("Search blocks by title, app or site")
+                    .accessibilityLabel("Search blocks by title, app, site or note")
                     .onExitCommand { vm.search = ""; searchFocus.wrappedValue = false }
+                // Always there, so the search field doesn't jump when you type.
+                scopeSwitch
                 Menu {
                     Button("All categories") { vm.categoryFilter = nil }
                     Divider()
-                    ForEach(vm.report.lanes, id: \.category) { lane in
-                        Button(lane.category.name) { vm.categoryFilter = lane.category }
+                    // The day's categories, or every category across all days.
+                    ForEach(vm.searchAllDays ? vm.categories : vm.report.lanes.map(\.category), id: \.self) { c in
+                        Button(c.name) { vm.categoryFilter = c }
                     }
                 } label: {
                     Text(vm.categoryFilter?.name ?? "All categories")
@@ -57,6 +60,84 @@ struct BlocksList: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
             }
+            if vm.isSearchingAllDays { allDays } else { dayRows }
+        }
+    }
+
+    /// This day | All days, beside the search field.
+    private var scopeSwitch: some View {
+        HStack(spacing: 0) {
+            ForEach([false, true], id: \.self) { all in
+                let on = vm.searchAllDays == all
+                Button(action: { vm.searchAllDays = all }) {
+                    Text(all ? "All days" : "This day").font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(on ? Theme.text : Theme.textMuted)
+                        .padding(.horizontal, 10).frame(height: 24)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(on ? Theme.surfaceControl : .clear))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Theme.railFill))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Search this day or all days")
+    }
+
+    // MARK: - All days
+
+    private var allDays: some View {
+        let days = vm.allDaysVisible
+        return VStack(spacing: 0) {
+            if vm.allDaysResults == nil {
+                Text("Searching…").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                    .padding(.horizontal, 12).padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
+            } else if days.isEmpty {
+                Text(vm.allDaysOlder == nil ? "No blocks match on any day." : "No matches in this category so far.").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                    .padding(.horizontal, 12).padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
+            }
+            ForEach(days, id: \.dayStart) { day in
+                HStack {
+                    Text(day.isToday ? "TODAY · \(Fmt.dayEyebrow(day.dayStart))" : Fmt.dayEyebrow(day.dayStart)).eyebrow()
+                    Spacer()
+                    Text(Durations.format(day.total)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.textFaint)
+                }
+                .padding(.horizontal, 12).padding(.top, 18).padding(.bottom, 6)
+                .accessibilityElement(children: .combine)
+                ForEach(Array(day.blocks.enumerated()), id: \.element.id) { i, b in
+                    BlockRow(block: b, selected: false, alsoIn: nil, alsoMinutes: 0, hideTopBorder: false)
+                        .onTapGesture { vm.openResult(day, b) }
+                        .accessibilityAction { vm.openResult(day, b) }
+                        .accessibilityHint("Opens this day with the block selected")
+                        .help("Open this day")
+                }
+            }
+            // One month at a time; older months on request, skipping ones with no match.
+            if let older = vm.allDaysOlder {
+                Button(action: vm.showOlderMonth) {
+                    Text("Show \(Fmt.date(older).formatted(Calendar.current.isDate(Fmt.date(older), equalTo: Date(), toGranularity: .year) ? .dateTime.month(.wide) : .dateTime.month(.wide).year()))")
+                        .font(.system(size: 13)).foregroundStyle(Theme.text)
+                        .padding(.horizontal, 12).frame(height: 32)
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .help("Add the next older month with a match")
+            }
+        }
+    }
+
+    // MARK: - This day
+
+    private var dayRows: some View {
             VStack(spacing: 0) {
                 let rows = vm.visibleBlocks
                 if rows.isEmpty {
@@ -96,10 +177,19 @@ struct BlocksList: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-        }
     }
 
     private var title: String {
+        if vm.isSearchingAllDays, vm.allDaysResults != nil {
+            let days = vm.allDaysVisible
+            let n = days.reduce(0) { $0 + $1.blocks.count }
+            let total = days.reduce(Int64(0)) { $0 + $1.total }
+            guard n > 0 else { return vm.search.isEmpty ? "NO BLOCKS" : "NO MATCHES" }
+            let noun = vm.search.isEmpty ? (n == 1 ? "BLOCK" : "BLOCKS") : (n == 1 ? "MATCH" : "MATCHES")
+            let count = "\(n) \(noun) · \(Durations.format(total).uppercased()) IN \(days.count) \(days.count == 1 ? "DAY" : "DAYS")"
+            return vm.categoryFilter.map { "\($0.name.uppercased()) · \(count)" } ?? count
+        }
+        if vm.isSearchingAllDays { return "ALL DAYS" }
         guard vm.isFiltering else {
             let n = vm.report.blocks.count
             return vm.report.isToday ? "BLOCKS · \(n) TODAY" : "BLOCKS · \(n)"
