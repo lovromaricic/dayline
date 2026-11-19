@@ -27,6 +27,10 @@ public struct Block: Equatable, Identifiable, Sendable {
     public var call: CallDetail?
     /// What you wrote on it: the first note among its segments.
     public var note: String?
+    /// The project most of its time belongs to; set by withProjects.
+    public var project: Project?
+    /// The rule that put it there, or nil when picked by hand.
+    public var projectRule: ProjectRule?
 }
 
 /// A call that counts as one Meetings block, and the proof of what you did on it.

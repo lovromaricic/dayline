@@ -40,6 +40,30 @@ final class SettingsController {
             write { try db.mergeCategory(c.id, into: to.id) }
         }
 
+        // Projects
+        viewModel.onAddProject = { [weak self] name, clientName in
+            self?.write {
+                let now = TrackingEngine.now()
+                let client = clientName.isEmpty ? nil : try db.addClient(name: clientName, at: now)
+                try db.addProject(name: name, clientID: client?.id, at: now)
+            }
+        }
+        viewModel.onAddClient = { [weak self] name in self?.write { try db.addClient(name: name, at: TrackingEngine.now()) } }
+        viewModel.onRenameProject = { [weak self] id, name in self?.write { try db.renameProject(id: id, name: name) } }
+        viewModel.onRenameClient = { [weak self] id, name in self?.write { try db.renameClient(id: id, name: name) } }
+        viewModel.onDeleteProjectRule = { [weak self] id in self?.write { try db.deleteProjectRule(id: id) } }
+        viewModel.onDeleteProject = { [weak self] p in
+            guard let self, confirmDelete("Delete \(p.name)?",
+                                          "Its \(Durations.format(viewModel.projectMonth[p.id] ?? 0)) this month and all earlier time go back to No project, and what it learned is removed. Your tracked time itself isn’t deleted.",
+                                          button: "Delete project") else { return }
+            viewModel.openProject = nil
+            write { try db.deleteProject(id: p.id) }
+        }
+        viewModel.onDeleteClient = { [weak self] c in
+            guard let self, confirmDelete("Delete \(c.name)?", "Its projects stay, without a client.", button: "Delete client") else { return }
+            write { try db.deleteClient(id: c.id) }
+        }
+
         // General
         viewModel.idleChoices = TrackingEngine.idleChoices
         viewModel.onSetStartAtLogin = { [weak self] on in
@@ -169,10 +193,38 @@ final class SettingsController {
         return others[picker.indexOfSelectedItem]
     }
 
-    /// Fresh values before the page is shown.
-    func prepare(section: SettingsSection = .general) {
+    /// Cancel owns Return and Escape; the destructive button needs a click.
+    private func confirmDelete(_ title: String, _ text: String, button: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: "Cancel")
+        let delete = alert.addButton(withTitle: button)
+        delete.hasDestructiveAction = true
+        delete.keyEquivalent = ""
+        return alert.runModal() == .alertSecondButtonReturn
+    }
+
+    /// Fresh values before the page is shown; `project` opens its panel.
+    func prepare(section: SettingsSection = .general, project: Int64? = nil) {
         viewModel.section = section
+        viewModel.openProject = project
         reload()
+    }
+
+    /// Each project's time this month, from its segments (hand-picked or by rule).
+    private func projectMonthTotals(_ resolver: ProjectResolver) -> [Int64: Int64] {
+        guard !resolver.isEmpty else { return [:] }
+        let cal = Calendar.current
+        let start = cal.dateInterval(of: .month, for: Date())?.start ?? Date()
+        let from = Int64(start.timeIntervalSince1970), now = TrackingEngine.now()
+        var totals: [Int64: Int64] = [:]
+        for s in (try? engine.store.segments(from: from, to: now)) ?? [] where s.kind == .active {
+            guard let p = resolver.resolve(s)?.project else { continue }
+            totals[p.id, default: 0] += min(s.end, now) - max(s.start, from)
+        }
+        return totals
     }
 
     private func write(_ change: () throws -> Void) {
@@ -190,6 +242,11 @@ final class SettingsController {
         let db = engine.database
         viewModel.categories = (try? db.categories()) ?? []
         viewModel.rules = (try? db.rules()) ?? []
+        viewModel.clients = (try? db.clients()) ?? []
+        viewModel.projects = engine.projects.list
+        viewModel.projectRules = engine.projects.rules
+        viewModel.projectMonth = projectMonthTotals(engine.projects)
+        if let id = viewModel.openProject, !viewModel.projects.contains(where: { $0.id == id }) { viewModel.openProject = nil }
         viewModel.unsorted = engine.unsorted()
         let recent = (try? db.recentApps(since: TrackingEngine.now() - 30 * 86_400)) ?? []
         viewModel.recentApps = recent

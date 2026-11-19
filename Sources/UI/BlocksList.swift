@@ -226,7 +226,9 @@ private struct BlockRow: View {
     /// A call says what you were in during it, each with its category's dot:
     /// "While in ● Novi kreditni accounti, ● amazon.de".
     private var subtitle: Text {
-        guard let call = block.call else { return Text(block.appName) }
+        guard let call = block.call else {
+            return Text(block.appName) + Text(block.project.map { " · \($0.fullName)" } ?? "").foregroundColor(Theme.textSecondary)
+        }
         let apps = call.totals.filter { $0.category != block.category }.prefix(2)
         guard !apps.isEmpty else { return Text("Call") }
         return apps.enumerated().reduce(Text("While in ")) { text, item in

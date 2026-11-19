@@ -320,3 +320,279 @@ struct NeverTrackList: View {
         adding = false
     }
 }
+
+// MARK: - Projects
+
+/// Clients and their projects, with time this month. A project opens a panel
+/// with what it learned ("Auto-adds"), where a wrong rule is removed.
+struct ProjectsPage: View {
+    @ObservedObject var vm: SettingsViewModel
+    @State private var adding: Adding?
+    @State private var name = ""
+    @State private var client = ""
+    @FocusState private var nameFocused: Bool
+
+    enum Adding { case project, client }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(alignment: .bottom) {
+                        pageHeader("Projects", "Grouped by client. Totals are for this month.")
+                        Spacer()
+                        HStack(spacing: 8) {
+                            outlineButton("+ New client") { start(.client) }
+                            outlineButton("+ New project") { start(.project) }
+                        }
+                    }
+                    if let adding { form(adding) }
+                    if vm.projects.isEmpty && adding == nil {
+                        empty
+                    }
+                    ForEach(groups, id: \.0) { client, projects in
+                        clientGroup(client, projects)
+                    }
+                    // Clients without projects yet still show, so you can add to them.
+                    ForEach(vm.clients.filter { c in !vm.projects.contains { $0.clientID == c.id } }) { c in
+                        clientGroup(c, [])
+                    }
+                }
+                .padding(.top, 16).padding(.horizontal, 40).padding(.bottom, 32).darkScroller()
+            }
+            if let id = vm.openProject, let p = vm.projects.first(where: { $0.id == id }) {
+                ProjectPanel(vm: vm, project: p).id(p.id)
+            }
+        }
+    }
+
+    private var groups: [(Client?, [Project])] {
+        var out: [(Client?, [Project])] = []
+        for p in vm.projects {
+            let c = p.clientID.flatMap { id in vm.clients.first { $0.id == id } }
+            if let i = out.firstIndex(where: { $0.0?.id == c?.id }) { out[i].1.append(p) } else { out.append((c, [p])) }
+        }
+        return out
+    }
+
+    private func start(_ a: Adding) {
+        adding = a
+        name = ""
+        client = ""
+        DispatchQueue.main.async { nameFocused = true }
+    }
+
+    private func submit() {
+        let n = name.trimmingCharacters(in: .whitespaces)
+        guard !n.isEmpty, let a = adding else { return }
+        switch a {
+        case .project: vm.onAddProject?(n, client.trimmingCharacters(in: .whitespaces))
+        case .client: vm.onAddClient?(n)
+        }
+        adding = nil
+    }
+
+    private func form(_ a: Adding) -> some View {
+        HStack(spacing: 8) {
+            TextField(a == .project ? "Project name" : "Client name", text: $name)
+                .textFieldStyle(.plain).font(.system(size: 13))
+                .focused($nameFocused)
+                .onSubmit(submit)
+                .padding(.horizontal, 12).frame(height: 34)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Theme.surfaceControl))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.accent.opacity(0.6)))
+            if a == .project {
+                HStack(spacing: 0) {
+                    TextField("Client (optional)", text: $client)
+                        .textFieldStyle(.plain).font(.system(size: 13))
+                        .onSubmit(submit)
+                    if !vm.clients.isEmpty {
+                        Menu {
+                            Button("No client") { client = "" }
+                            Divider()
+                            ForEach(vm.clients) { c in Button(c.name) { client = c.name } }
+                        } label: {
+                            Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.textMuted)
+                                .frame(width: 24, height: 30).contentShape(Rectangle())
+                        }
+                        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                        .help("Pick a client")
+                    }
+                }
+                .padding(.leading, 12).padding(.trailing, 4).frame(width: 220, height: 34)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Theme.surfaceControl))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
+            }
+            outlineButton("Cancel") { adding = nil }
+            Button(action: submit) {
+                Text("Add").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, 14).frame(height: 34)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Theme.accent))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+        }
+        .onExitCommand { adding = nil }
+    }
+
+    private var empty: some View {
+        VStack(spacing: 10) {
+            Text("Add your first project").font(.system(size: 18, weight: .light))
+            Text("Then pick it on any block, and Dayline learns where similar work belongs. A client is optional.")
+                .font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                .multilineTextAlignment(.center).frame(maxWidth: 420)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 48)
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+    }
+
+    private func clientGroup(_ c: Client?, _ projects: [Project]) -> some View {
+        let total = projects.reduce(Int64(0)) { $0 + (vm.projectMonth[$1.id] ?? 0) }
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Text((c?.name ?? "No client").uppercased()).eyebrow()
+                Text(Durations.format(total)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.textFaint)
+                Spacer()
+                if let c {
+                    Menu {
+                        Button("Rename…") { rename(c) }
+                        Button("Delete client…") { vm.onDeleteClient?(c) }
+                    } label: {
+                        Image(systemName: "ellipsis").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                            .frame(width: 24, height: 20).contentShape(Rectangle())
+                    }
+                    .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                    .accessibilityLabel("\(c.name) options")
+                }
+            }
+            VStack(spacing: 0) {
+                if projects.isEmpty {
+                    Text("No projects yet.").font(.system(size: 13)).foregroundStyle(Theme.textMuted)
+                        .padding(.horizontal, 18).padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                ForEach(Array(projects.enumerated()), id: \.element.id) { i, p in
+                    Button { vm.openProject = vm.openProject == p.id ? nil : p.id } label: {
+                        HStack(spacing: 16) {
+                            Text(p.name).font(.system(size: 14))
+                            Spacer()
+                            Text(Durations.format(vm.projectMonth[p.id] ?? 0)).font(.system(size: 13).monospacedDigit())
+                                .foregroundStyle(Theme.textMuted)
+                            Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.textFaint)
+                        }
+                        .padding(.horizontal, 18).frame(height: 44)
+                        .background(vm.openProject == p.id ? Color.white.opacity(0.06) : .clear)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .overlay(alignment: .top) { Rectangle().fill(i == 0 ? .clear : Theme.border).frame(height: 1) }
+                    .accessibilityHint("Shows what this project auto-adds")
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.02)))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+        }
+    }
+
+    private func rename(_ c: Client) {
+        if let n = askName("Rename client", c.name) { vm.onRenameClient?(c.id, n) }
+    }
+}
+
+/// One project's details: time, what it auto-adds, rename and delete.
+private struct ProjectPanel: View {
+    @ObservedObject var vm: SettingsViewModel
+    let project: Project
+
+    private var rules: [ProjectRule] { vm.projectRules.filter { $0.projectID == project.id } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let c = project.clientName { Text(c).font(.system(size: 12)).foregroundStyle(Theme.textMuted) }
+                    Text(project.name).font(.system(size: 24, weight: .light))
+                }
+                Spacer()
+                Button { vm.openProject = nil } label: {
+                    Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.textMuted)
+                        .frame(width: 24, height: 24).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).accessibilityLabel("Close")
+                .keyboardShortcut(.cancelAction)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Durations.format(vm.projectMonth[project.id] ?? 0)).font(.system(size: 22, weight: .light).monospacedDigit())
+                Text("this month").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("AUTO-ADDS").eyebrow()
+                Text("Blocks matching these go to \(project.name) by themselves.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                if rules.isEmpty {
+                    Text("Nothing yet. Pick \(project.name) on a block and choose Always.")
+                        .font(.system(size: 13)).foregroundStyle(Theme.textFaint)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 4)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(rules.enumerated()), id: \.element.id) { i, r in
+                            HStack(spacing: 10) {
+                                Text(r.kind == .titleContains ? "Title" : r.kind.label)
+                                    .font(.system(size: 11)).foregroundStyle(Theme.textMuted).frame(width: 34, alignment: .leading)
+                                Text(r.pattern).font(.system(size: 13)).lineLimit(1).truncationMode(.middle)
+                                Spacer(minLength: 4)
+                                Button { vm.onDeleteProjectRule?(r.id) } label: {
+                                    Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.textFaint)
+                                        .frame(width: 20, height: 20).contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Stop adding these to \(project.name)")
+                                .accessibilityLabel("Remove \(r.pattern)")
+                            }
+                            .padding(.horizontal, 12).frame(height: 36)
+                            .overlay(alignment: .top) { Rectangle().fill(i == 0 ? .clear : Theme.border).frame(height: 1) }
+                        }
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border))
+                    Text("Removing one keeps past blocks you moved by hand where they are.")
+                        .font(.system(size: 12)).foregroundStyle(Theme.textFaint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            VStack(alignment: .leading, spacing: 10) {
+                Button("Rename…") {
+                    if let n = askName("Rename project", project.name) { vm.onRenameProject?(project.id, n) }
+                }
+                .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                Button("Delete project…") { vm.onDeleteProject?(project) }
+                    .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.danger)
+            }
+        }
+        .padding(.top, 24).padding(.horizontal, 24).padding(.bottom, 24)
+        .frame(width: 320, alignment: .topLeading)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.white.opacity(0.02))
+        .overlay(alignment: .leading) { Rectangle().fill(Theme.border).frame(width: 1) }
+    }
+}
+
+/// A small name prompt (rename); nil when cancelled or left empty.
+@MainActor
+private func askName(_ title: String, _ current: String) -> String? {
+    let alert = NSAlert()
+    alert.messageText = title
+    let field = NSTextField(string: current)
+    field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+    alert.accessoryView = field
+    alert.addButton(withTitle: "Rename")
+    alert.addButton(withTitle: "Cancel")
+    alert.window.initialFirstResponder = field
+    guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+    let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+    return name.isEmpty ? nil : name
+}

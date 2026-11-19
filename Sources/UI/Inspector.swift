@@ -87,6 +87,9 @@ struct Inspector: View {
                 }
             }
             categorySelect(b)
+            // Nothing about projects shows until one exists.
+            if !vm.projects.isEmpty { projectSelect(b) }
+            if let c = vm.pendingProjectRule, c.blockID == b.id { projectPrompt(c) }
             NoteField(vm: vm, block: b)
             if let call = vm.splitCall(containing: b) { wholeCall(call) }
             if let c = vm.pendingCorrection, c.blockID == b.id {
@@ -134,6 +137,98 @@ struct Inspector: View {
                 Text("Changed from \(b.guess.name)").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
             }
         }
+    }
+
+    /// "Erste · Krediti", grouped by client, with No project first.
+    private func projectSelect(_ b: Block) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Project").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            Menu {
+                Button { vm.setProject(b, nil) } label: {
+                    if b.project == nil { Label("No project", systemImage: "checkmark") } else { Text("No project") }
+                }
+                ForEach(projectGroups, id: \.0) { client, projects in
+                    Divider()
+                    Section(client ?? "No client") {
+                        ForEach(projects) { p in
+                            Button { vm.setProject(b, p) } label: {
+                                if p == b.project { Label(p.name, systemImage: "checkmark") } else { Text(p.name) }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    if let p = b.project {
+                        (Text(p.clientName.map { "\($0) · " } ?? "").foregroundColor(Theme.textMuted) + Text(p.name))
+                            .font(.system(size: 14)).lineLimit(1)
+                    } else {
+                        Text("No project").font(.system(size: 14)).foregroundStyle(Theme.textMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.textMuted)
+                }
+                .padding(.leading, 12).padding(.trailing, 14)
+                .frame(height: 40)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Theme.surfaceControl))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.border))
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .accessibilityLabel("Project, \(b.project?.fullName ?? "none")")
+            // Why it is there, so a wrong guess can be traced and fixed.
+            if let rule = b.projectRule, let p = b.project, vm.pendingProjectRule?.blockID != b.id {
+                Button { vm.onShowProject?(p) } label: {
+                    (Text("Because of “\(rule.pattern)” · ") + Text("See \(p.name)’s rules").foregroundColor(Theme.textSecondary))
+                        .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                        .lineLimit(2).multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// Projects by client, in the order the store gives them (no client last).
+    private var projectGroups: [(String?, [Project])] {
+        var groups: [(String?, [Project])] = []
+        for p in vm.projects {
+            if let i = groups.firstIndex(where: { $0.0 == p.clientName }) { groups[i].1.append(p) } else { groups.append((p.clientName, [p])) }
+        }
+        return groups
+    }
+
+    private func projectPrompt(_ c: ProjectCorrection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Always put \(c.pattern) in \(c.project.name)?")
+                .font(.system(size: 14, weight: .medium))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(c.kind == .site ? "Time on this site counts there in any day, past ones too."
+                 : "Counts in any app, past days too.")
+                .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            HStack(spacing: 8) {
+                Button(action: vm.projectAlways) {
+                    Text("Always").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.onAccent)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Theme.accent))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Button(action: { vm.pendingProjectRule = nil }) {
+                    Text("Just this time").font(.system(size: 14))
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.accent.opacity(0.35)))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.accent.opacity(0.07)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.accent.opacity(0.35)))
     }
 
     /// The point of a call block: what you got done while on it, by category

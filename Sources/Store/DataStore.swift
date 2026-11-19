@@ -115,6 +115,7 @@ extension DaylineDatabase {
     public func deleteAll() throws {
         try pool.write { db in
             try db.execute(sql: "DELETE FROM segment; DELETE FROM rule; DELETE FROM exclusion; DELETE FROM title_label;")
+            try db.execute(sql: "DELETE FROM project_rule; DELETE FROM project; DELETE FROM client;")
             try db.execute(sql: "DELETE FROM setting WHERE key LIKE 'alias.%'")
             try db.execute(sql: "DELETE FROM category WHERE id > ?", arguments: [ActivityCategory.uncategorized.id])
             for (sort, c) in ActivityCategory.defaults.enumerated() {

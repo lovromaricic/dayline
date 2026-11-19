@@ -229,3 +229,37 @@ extension StoreTests {
         #expect(try d.hideSavedTitles(kind: .site, pattern: "figma.com") == 0)   // already hidden
     }
 }
+
+@Suite struct ProjectStoreTests {
+    func db() throws -> DaylineDatabase {
+        try DaylineDatabase(url: FileManager.default.temporaryDirectory.appending(path: "dayline-test-\(UUID().uuidString).sqlite"))
+    }
+
+    @Test func clientsProjectsAndRules() throws {
+        let d = try db()
+        let erste = try d.addClient(name: "Erste", at: 1)
+        #expect(try d.addClient(name: "erste ", at: 2) == erste)  // same client, any case
+        let krediti = try d.addProject(name: "Krediti", clientID: erste.id, at: 3)
+        let dayline = try d.addProject(name: "Dayline", clientID: nil, at: 4)
+        #expect(try d.projects().map(\.fullName) == ["Erste · Krediti", "Dayline"])
+        try d.addProjectRule(projectID: krediti.id, kind: .titleContains, pattern: "Kreditni limiti", at: 5)
+        try d.addProjectRule(projectID: dayline.id, kind: .titleContains, pattern: "kreditni limiti", at: 6)  // taught again: moves
+        #expect(try d.projectRules().map(\.projectID) == [dayline.id])
+        try d.deleteClient(id: erste.id)
+        #expect(try d.projects().first { $0.id == krediti.id }?.clientName == nil)
+    }
+
+    @Test func deletingAProjectFreesItsBlocks() throws {
+        let d = try db()
+        let store = SegmentStore(database: d)
+        let p = try d.addProject(name: "Krediti", clientID: nil, at: 1)
+        try store.apply([.begin(SegmentDraft(start: 10, kind: .active, activity: Activity(appBundleID: "a", appName: "A"))), .end(at: 20)])
+        let id = try store.segments(from: 0, to: 100)[0].id
+        try store.setManualProject(segmentIDs: [id], projectID: p.id)
+        #expect(try store.segments(from: 0, to: 100)[0].manualProjectID == p.id)
+        try d.addProjectRule(projectID: p.id, kind: .app, pattern: "a", at: 2)
+        try d.deleteProject(id: p.id)
+        #expect(try store.segments(from: 0, to: 100)[0].manualProjectID == nil)
+        #expect(try d.projectRules().isEmpty)
+    }
+}

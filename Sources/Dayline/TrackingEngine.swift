@@ -15,6 +15,7 @@ final class TrackingEngine {
     let database: DaylineDatabase
     let store: SegmentStore
     private(set) var categorizer = Categorizer()
+    private(set) var projects = ProjectResolver()
     private var segmenter = Segmenter()
     private var exclusions: Exclusions
     private let permission = PermissionMonitor()
@@ -180,6 +181,7 @@ final class TrackingEngine {
 
     /// After rules or categories change; history re-categorizes on the next read.
     func reloadCategories() {
+        projects = (try? database.projectResolver()) ?? ProjectResolver()
         if let list = try? database.categories() { categorizer.setCategories(list) }
         if let rules = try? database.rules() { categorizer.setRules(rules) }
         if let aliases = try? database.categoryAliases() { categorizer.aliases = aliases }

@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timeline.onRulesChanged = { [weak self] in self?.refresh() }
         timeline.onOpenSettings = { [weak self] in self?.openSettings() }
         timeline.onSortUnsorted = { [weak self] in self?.openSettings(section: .categories) }
+        timeline.onShowProject = { [weak self] p in self?.openSettings(section: .projects, project: p.id) }
         settings = SettingsController(engine: engine)
         settings.onChange = { [weak self] in
             self?.refresh()
@@ -119,9 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettingsAction() { openSettings() }
 
-    private func openSettings(section: SettingsSection = .general) {
+    private func openSettings(section: SettingsSection = .general, project: Int64? = nil) {
         statusItem.closePopover()
-        settings.prepare(section: section)
+        settings.prepare(section: section, project: project)
         timeline.show(settings: settings.view)
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 public enum SettingsSection: String, CaseIterable, Sendable {
     case general = "General"
     case categories = "Categories & rules"
+    case projects = "Projects"
     case privacy = "Privacy & data"
 }
 
@@ -101,6 +102,25 @@ public final class SettingsViewModel: ObservableObject {
     public var onExport: ((ExportFormat) -> Void)?
     public var onDeleteAll: (() -> Void)?
 
+    // Projects
+    @Published public var clients: [Client] = []
+    /// Grouped by client, no client last.
+    @Published public var projects: [Project] = []
+    @Published public var projectRules: [ProjectRule] = []
+    /// Time this month per project id.
+    @Published public var projectMonth: [Int64: Int64] = [:]
+    /// The project whose panel is open.
+    @Published public var openProject: Int64?
+    /// Name and client name (an existing one or a new one); empty is no client.
+    public var onAddProject: ((String, String) -> Void)?
+    public var onAddClient: ((String) -> Void)?
+    public var onRenameProject: ((Int64, String) -> Void)?
+    public var onRenameClient: ((Int64, String) -> Void)?
+    /// The app confirms first.
+    public var onDeleteProject: ((Project) -> Void)?
+    public var onDeleteClient: ((Client) -> Void)?
+    public var onDeleteProjectRule: ((Int64) -> Void)?
+
     public init() {}
 
     /// The category list without the system Uncategorized, for chips.
@@ -136,6 +156,7 @@ public struct SettingsView: View {
                     switch vm.section {
                     case .categories: CategoriesPage(vm: vm)
                     case .general: GeneralPage(vm: vm)
+                    case .projects: ProjectsPage(vm: vm)
                     case .privacy: PrivacyPage(vm: vm)
                     }
                 }

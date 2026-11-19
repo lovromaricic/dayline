@@ -146,6 +146,20 @@ let selectedVM = HomeViewModel(report: correctedReport)
 let corrected = correctedReport.blocks.first { $0.host == "developer.apple.com" }!
 selectedVM.selection = corrected.id
 selectedVM.pendingCorrection = Correction.subject(for: corrected, category: .development)
+// Projects: Onboarding blocks belong to Erste · Krediti by a rule; one is selected
+// right after picking it by hand, with the Always prompt.
+let krediti = Project(id: 1, name: "Krediti", clientID: 1, clientName: "Erste")
+let georgeApp = Project(id: 2, name: "George app", clientID: 1, clientName: "Erste")
+let projectRule = ProjectRule(id: 1, projectID: 1, kind: .titleContains, pattern: "Onboarding", createdAt: at(9, 0))
+let projectReport = homeReport.withProjects(ProjectResolver(projects: [krediti, georgeApp], rules: [projectRule]), segments: homeDay)
+let projectVM = HomeViewModel(report: projectReport)
+projectVM.projects = [krediti, georgeApp]
+let pickedBlock = projectReport.blocks.first { $0.appName == "Xcode" }!
+projectVM.selection = pickedBlock.id
+projectVM.pendingProjectRule = ProjectCorrection(blockID: pickedBlock.id, kind: .titleContains, pattern: "CaptureService.swift", project: georgeApp)
+let ruleVM = HomeViewModel(report: projectReport)
+ruleVM.projects = [krediti, georgeApp]
+ruleVM.selection = projectReport.blocks.first { $0.title == "Onboarding – Figma" }!.id
 func vm(_ report: DayReport, _ phase: TrackingPhase, granted: Bool = false) -> HomeViewModel {
     let v = HomeViewModel(report: report)
     v.phase = phase
@@ -255,6 +269,8 @@ let homes: [(String, HomeViewModel)] = [
     ("home-10-search-all-days", searchAllVM),
     ("home-08-filtered", filteredVM),
     ("home-01-selected", selectedVM),
+    ("home-14-project-prompt", projectVM),
+    ("home-15-project-rule", ruleVM),
     ("home-02-nothing-selected", HomeViewModel(report: homeReport)),
     ("home-03-first-launch", vm(empty, .needsPermission)),
     ("home-04-waiting", vm(empty, .waitingForPermission)),
@@ -300,8 +316,13 @@ MainActor.assumeIsolated {
     s.titlesOnScreen = .calls
     s.storageText = "4.2 MB since 9 Nov"
     s.builtins = BuiltinRules.all.map { BuiltinRuleRow(kind: $0.kind, label: $0.label, category: $0.category) }
+    s.clients = [Client(id: 1, name: "Erste"), Client(id: 2, name: "Infobip")]
+    s.projects = [krediti, georgeApp, Project(id: 3, name: "Website", clientID: 2, clientName: "Infobip"), Project(id: 4, name: "Dayline")]
+    s.projectRules = [projectRule, ProjectRule(id: 2, projectID: 1, kind: .titleContains, pattern: "kreditni", createdAt: at(8, 0))]
+    s.projectMonth = [1: 22 * 3600 + 600, 2: 12 * 3600 + 600, 3: 6 * 3600 + 1800, 4: 6 * 3600 + 3000]
+    s.openProject = 1
     for (name, section, height) in [("settings-categories-unsorted", SettingsSection.categories, 1000.0),
-                                    ("settings-privacy", .privacy, 900)] {
+                                    ("settings-privacy", .privacy, 900), ("settings-projects", .projects, 760)] {
         s.section = section
         let host = NSHostingView(rootView: SettingsView(viewModel: s).frame(width: 1200, height: height))
         let win = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 1200, height: height), styleMask: [.borderless], backing: .buffered, defer: false)

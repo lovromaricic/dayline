@@ -59,13 +59,15 @@ public struct Segment: Equatable, Sendable {
     public var manualCategoryID: Int64?
     /// What you wrote on the block this segment is part of.
     public var note: String?
+    /// A project picked by hand; ProjectResolver.none for "No project".
+    public var manualProjectID: Int64?
     /// Inside a call long enough to count as one Meetings block. Set by
     /// DayReport, never stored.
     public var wholeCall = false
 
     public init(id: Int64, start: Int64, end: Int64, kind: SegmentKind, appBundleID: String = "", appName: String = "",
                 title: String? = nil, host: String? = nil, domain: String? = nil, call: Bool = false,
-                manualCategoryID: Int64? = nil, note: String? = nil) {
+                manualCategoryID: Int64? = nil, note: String? = nil, manualProjectID: Int64? = nil) {
         self.id = id
         self.start = start
         self.end = end
@@ -78,6 +80,7 @@ public struct Segment: Equatable, Sendable {
         self.call = call
         self.manualCategoryID = manualCategoryID
         self.note = note
+        self.manualProjectID = manualProjectID
     }
 
     public var duration: Int64 { end - start }

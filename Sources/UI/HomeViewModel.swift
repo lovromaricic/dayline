@@ -46,6 +46,39 @@ public struct Correction: Equatable, Sendable {
     }
 }
 
+/// "Always put Kreditni limiti in Krediti?": what Dayline would remember for a block.
+public struct ProjectCorrection: Equatable, Sendable {
+    public var blockID: Int64
+    public var kind: Rule.Kind
+    public var pattern: String
+    public var project: Project
+
+    public init(blockID: Int64, kind: Rule.Kind, pattern: String, project: Project) {
+        self.blockID = blockID
+        self.kind = kind
+        self.pattern = pattern
+        self.project = project
+    }
+
+    /// The file or page title without the app's name; a site when the title
+    /// says nothing; nil for something too generic to remember ("Slack").
+    public static func subject(for b: Block, project: Project) -> ProjectCorrection? {
+        guard b.call == nil else { return nil }
+        if let raw = b.title {
+            let title = Titles.withoutAppSuffix(raw).trimmingCharacters(in: .whitespaces)
+            let generic = ["untitled", "new tab", "inbox", "home", b.appName.lowercased()]
+            if title.count >= 3, !generic.contains(title.lowercased()) {
+                return ProjectCorrection(blockID: b.id, kind: .titleContains, pattern: title, project: project)
+            }
+        }
+        if let host = b.host {
+            let site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            return ProjectCorrection(blockID: b.id, kind: .site, pattern: site, project: project)
+        }
+        return nil
+    }
+}
+
 /// A day in an All days search, with its matching blocks, newest first.
 public struct SearchDay: Equatable, Sendable {
     public var dayStart: Int64
@@ -83,6 +116,10 @@ public final class HomeViewModel: ObservableObject {
     @Published public var categories: [ActivityCategory] = ActivityCategory.defaults
     /// Shown under the select after a correction, until answered or deselected.
     @Published public var pendingCorrection: Correction?
+    /// Every project, grouped by client; empty hides everything about projects.
+    @Published public var projects: [Project] = []
+    /// "Always put … in …?" after picking a project, until answered or deselected.
+    @Published public var pendingProjectRule: ProjectCorrection?
 
     // Tracking state (spec 2.2) and onboarding settings (screens 03–07).
     @Published public var phase: TrackingPhase = .tracking
@@ -160,9 +197,31 @@ public final class HomeViewModel: ObservableObject {
         select(block.id)
     }
 
-    /// What search looks at: title, app, site and your note.
+    /// What search looks at: title, app, site, your note and the project.
     public static func matches(_ b: Block, _ query: String) -> Bool {
-        query.isEmpty || [b.title, b.appName, b.host, b.note].contains { $0?.localizedCaseInsensitiveContains(query) ?? false }
+        query.isEmpty || [b.title, b.appName, b.host, b.note, b.project?.fullName]
+            .contains { $0?.localizedCaseInsensitiveContains(query) ?? false }
+    }
+
+    /// The inspector's Project select; nil is "No project".
+    public var onSetProject: ((Block, Project?) -> Void)?
+    /// "Always": the project learns the block's title or site.
+    public var onProjectAlways: ((ProjectCorrection) -> Void)?
+    /// "See Krediti's rules": Settings → Projects with that project open.
+    public var onShowProject: ((Project) -> Void)?
+
+    public func setProject(_ block: Block, _ project: Project?) {
+        guard project != block.project || block.projectRule != nil else { return }
+        selection = block.id
+        pendingCorrection = nil
+        pendingProjectRule = project.flatMap { ProjectCorrection.subject(for: block, project: $0) }
+        onSetProject?(block, project)
+    }
+
+    public func projectAlways() {
+        guard let c = pendingProjectRule else { return }
+        pendingProjectRule = nil
+        onProjectAlways?(c)
     }
 
     /// "Note": what you wrote on a block; empty removes it.
@@ -270,7 +329,7 @@ public final class HomeViewModel: ObservableObject {
     }
 
     public func select(_ id: Int64?) {
-        if id != selection { pendingCorrection = nil }
+        if id != selection { pendingCorrection = nil; pendingProjectRule = nil }
         selection = id
         // Keep the selected row visible in the list.
         if let id, !visibleBlocks.contains(where: { $0.id == id }) {
@@ -300,11 +359,18 @@ public final class HomeViewModel: ObservableObject {
             search = ""
             categoryFilter = nil
             pendingCorrection = nil
+            pendingProjectRule = nil
         } else if let id = selection, !new.blocks.contains(where: { $0.id == id }) {
             // A correction can merge the block into a neighbour; follow its segments.
             let moved = new.blocks.first { $0.segmentIDs.contains(id) }?.id
             selection = moved
-            if let moved { pendingCorrection?.blockID = moved } else { pendingCorrection = nil }
+            if let moved {
+                pendingCorrection?.blockID = moved
+                pendingProjectRule?.blockID = moved
+            } else {
+                pendingCorrection = nil
+                pendingProjectRule = nil
+            }
         }
         if new != report { report = new }
     }

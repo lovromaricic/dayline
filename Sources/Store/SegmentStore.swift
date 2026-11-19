@@ -49,7 +49,7 @@ public final class SegmentStore {
                               appBundleID: r["app_bundle_id"], appName: r["app_name"], title: r["title"],
                               host: r["host"], domain: r["domain"], call: r["call"],
                               manualCategoryID: (r["category_source"] as String?) == "manual" ? r["category_id"] : nil,
-                              note: r["note"])
+                              note: r["note"], manualProjectID: r["project_id"])
             }
         }
     }
@@ -90,6 +90,18 @@ public final class SegmentStore {
         try db.pool.write { db in
             try db.execute(sql: "UPDATE segment SET note = ? WHERE id IN (\(marks))",
                            arguments: StatementArguments([text.isEmpty ? nil : text] as [DatabaseValueConvertible?]
+                                                         + segmentIDs.map { $0 as DatabaseValueConvertible? }))
+        }
+    }
+
+    /// A project picked by hand: an id, ProjectResolver.none for "No project",
+    /// or nil to let the project rules decide again.
+    public func setManualProject(segmentIDs: [Int64], projectID: Int64?) throws {
+        guard !segmentIDs.isEmpty else { return }
+        let marks = segmentIDs.map { _ in "?" }.joined(separator: ",")
+        try db.pool.write { db in
+            try db.execute(sql: "UPDATE segment SET project_id = ? WHERE id IN (\(marks))",
+                           arguments: StatementArguments([projectID] as [DatabaseValueConvertible?]
                                                          + segmentIDs.map { $0 as DatabaseValueConvertible? }))
         }
     }

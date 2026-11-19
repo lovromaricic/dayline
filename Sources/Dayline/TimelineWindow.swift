@@ -24,6 +24,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     var onOpenSettings: (() -> Void)?
     /// The Sort note: Settings → Categories & rules.
     var onSortUnsorted: (() -> Void)?
+    /// "See Krediti's rules": Settings → Projects with that project open.
+    var onShowProject: ((Project) -> Void)?
     private static let settingsItem = NSToolbarItem.Identifier("settings")
 
     init(engine: TrackingEngine) {
@@ -34,6 +36,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         super.init()
         viewModel.onMoveDay = { [weak self] days in self?.move(days: days) }
         viewModel.onSortUnsorted = { [weak self] in self?.onSortUnsorted?() }
+        viewModel.onShowProject = { [weak self] p in self?.onShowProject?(p) }
         viewModel.onPickDay = { [weak self] date in self?.show(day: Self.startOfDay(date)) }
         viewModel.onSetPeriod = { [weak self] _ in self?.reload(); self?.viewModel.replay += 1 }
         viewModel.onSetCategory = { [weak self] block, category in self?.setCategory(block, category) }
@@ -41,6 +44,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onSplitCall = { [weak self] block in self?.splitCall(block) }
         viewModel.onDeleteBlock = { [weak self] block in self?.deleteBlock(block) }
         viewModel.onSetNote = { [weak self] block, note in self?.setNote(block, note) }
+        viewModel.onSetProject = { [weak self] block, project in self?.setProject(block, project) }
+        viewModel.onProjectAlways = { [weak self] c in self?.projectAlways(c) }
         viewModel.onSearchAllDays = { [weak self] query in self?.searchAllDays(query) }
         viewModel.onShowOlderMonth = { [weak self] in self?.showOlderMonth() }
         viewModel.onWholeCall = { [weak self] call in self?.wholeCall(call) }
@@ -108,6 +113,34 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         }
         reload()
         onRulesChanged?()
+    }
+
+    /// Picked by hand; when the rules would pick the same anyway, nothing is pinned.
+    private func setProject(_ block: Block, _ project: Project?) {
+        let ids = Set(block.segmentIDs)
+        let resolver = engine.projects
+        let automatic = segments.filter { ids.contains($0.id) }
+            .allSatisfy { resolver.resolve($0, ignoringManual: true)?.project == project }
+        do {
+            try engine.store.setManualProject(segmentIDs: block.segmentIDs,
+                                              projectID: automatic ? nil : project?.id ?? ProjectResolver.none)
+        } catch {
+            Log.line("project failed: \(error)")
+        }
+        reload()
+    }
+
+    private func projectAlways(_ c: ProjectCorrection) {
+        do {
+            try engine.database.addProjectRule(projectID: c.project.id, kind: c.kind, pattern: c.pattern, at: TrackingEngine.now())
+            if let block = viewModel.report.blocks.first(where: { $0.id == c.blockID }) {
+                try engine.store.setManualProject(segmentIDs: block.segmentIDs, projectID: nil)
+            }
+        } catch {
+            Log.line("project rule failed: \(error)")
+        }
+        engine.reloadCategories()
+        reload()
     }
 
     private func setNote(_ block: Block, _ note: String) {
@@ -271,8 +304,9 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         segments = (try? engine.store.segments(from: dayStart, to: next)) ?? []
         let categorizer = engine.categorizer
         if viewModel.categories != categorizer.categoryList { viewModel.categories = categorizer.categoryList }
+        if viewModel.projects != engine.projects.list { viewModel.projects = engine.projects.list }
         let report = DayReport(segments: segments, dayStart: dayStart, now: TrackingEngine.now(),
-                               resolve: { categorizer.resolve($0) })
+                               resolve: { categorizer.resolve($0) }).withProjects(engine.projects, segments: segments)
         viewModel.update(engine.hidesTitlesNow ? report.hidingTitles() : report)
         let week = viewModel.period == .day ? nil : loadSpan()
         if viewModel.week != week { viewModel.week = week }
@@ -336,6 +370,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
             let next = Self.startOfDay(cal.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: TimeInterval(day)))!)
             let segs = (try? engine.store.segments(from: day, to: next)) ?? []
             var report = DayReport(segments: segs, dayStart: day, now: now, resolve: { categorizer.resolve($0) })
+                .withProjects(engine.projects, segments: segs)
             if engine.hidesTitlesNow { report = report.hidingTitles() }
             let blocks = report.blocks.reversed().filter { HomeViewModel.matches($0, searchQuery) }
             return blocks.isEmpty ? nil : SearchDay(dayStart: day, isToday: day == today, blocks: blocks)

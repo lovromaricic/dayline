@@ -85,6 +85,25 @@ public final class DaylineDatabase {
             // A note you write on a block, kept on each of its segments.
             try db.execute(sql: "ALTER TABLE segment ADD COLUMN note TEXT")
         }
+        m.registerMigration("v5-projects") { db in
+            // Clients group projects; a block's project is picked by hand
+            // (segment.project_id, 0 = "No project") or by a project rule.
+            try db.execute(sql: """
+                CREATE TABLE client (id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL);
+                CREATE TABLE project (
+                  id INTEGER PRIMARY KEY,
+                  name TEXT NOT NULL,
+                  client_id INTEGER REFERENCES client(id) ON DELETE SET NULL,
+                  created_at INTEGER NOT NULL);
+                CREATE TABLE project_rule (
+                  id INTEGER PRIMARY KEY,
+                  project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+                  kind TEXT NOT NULL,
+                  pattern TEXT NOT NULL,
+                  created_at INTEGER NOT NULL);
+                ALTER TABLE segment ADD COLUMN project_id INTEGER;
+                """)
+        }
         return m
     }
 

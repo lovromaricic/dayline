@@ -76,7 +76,14 @@ public struct Rule: Equatable, Identifiable, Sendable {
     }
 
     public func matches(_ s: Segment) -> Bool {
-        switch kind {
+        kind.matches(pattern, s)
+    }
+}
+
+extension Rule.Kind {
+    /// Shared by category rules and project rules.
+    public func matches(_ pattern: String, _ s: Segment) -> Bool {
+        switch self {
         case .site:
             let p = pattern.lowercased()
             guard let host = s.host else { return false }
