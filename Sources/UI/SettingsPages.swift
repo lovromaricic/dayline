@@ -485,7 +485,7 @@ struct ProjectsPage: View {
                 Text(clientTotal(c, projects, total)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.textFaint)
                 Spacer()
                 if let c {
-                    Button("Export") { vm.onExportClient?(c) }
+                    Button("Export hours") { vm.onExportClient?(c) }
                         .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
                         .disabled(projects.isEmpty)
                     Menu {
