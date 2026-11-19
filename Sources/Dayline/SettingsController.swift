@@ -59,6 +59,26 @@ final class SettingsController {
             viewModel.openProject = nil
             write { try db.deleteProject(id: p.id) }
         }
+        viewModel.onEditClientRate = { [weak self] c in
+            guard let self, let (rate, currency) = askRate("Hourly rate for \(c.name)",
+                                                         "Used for all its projects unless one has its own. Leave empty for hours only.",
+                                                         rate: c.rate, currency: c.currency ?? defaultCurrency, currencyPicker: true) else { return }
+            write { try db.setClientRate(id: c.id, rate: rate, currency: currency) }
+        }
+        viewModel.onEditProjectRate = { [weak self] p in
+            guard let self else { return }
+            let hint = p.clientRate.map { "Leave empty to use \(p.clientName ?? "the client")’s rate (\(Self.plain($0)) \(p.currency))." }
+                ?? "Leave empty for hours only."
+            // A project without a client keeps its currency on a client-less default: your Mac's.
+            guard let (rate, _) = askRate("Hourly rate for \(p.name)", hint, rate: p.rate, currency: p.currency, currencyPicker: false) else { return }
+            write { try db.setProjectRate(id: p.id, rate: rate) }
+        }
+        viewModel.onExportClient = { [weak self] c in
+            self?.export(name: c.name) { $0.clientID == c.id }
+        }
+        viewModel.onExportProject = { [weak self] p in
+            self?.export(name: [p.clientName, p.name].compactMap { $0 }.joined(separator: "-")) { $0.id == p.id }
+        }
         viewModel.onDeleteClient = { [weak self] c in
             guard let self, confirmDelete("Delete \(c.name)?", "Its projects stay, without a client.", button: "Delete client") else { return }
             write { try db.deleteClient(id: c.id) }
@@ -191,6 +211,117 @@ final class SettingsController {
         delete.keyEquivalent = ""
         guard alert.runModal() == .alertSecondButtonReturn, others.indices.contains(picker.indexOfSelectedItem) else { return nil }
         return others[picker.indexOfSelectedItem]
+    }
+
+    private static func plain(_ n: Double) -> String { n.rounded() == n ? String(Int(n)) : String(format: "%.2f", n) }
+
+    /// Rate per hour and currency; nil when cancelled. An empty field clears the rate.
+    private func askRate(_ title: String, _ text: String, rate: Double?, currency: String,
+                         currencyPicker: Bool) -> (Double?, String?)? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        let field = NSTextField(string: rate.map(Self.plain) ?? "")
+        field.placeholderString = "60"
+        field.frame = NSRect(x: 0, y: 0, width: 100, height: 24)
+        let codes = Array(Set(["EUR", "USD", "GBP", "CHF", defaultCurrency, currency])).sorted()
+        let picker = NSPopUpButton(frame: NSRect(x: 108, y: -1, width: 90, height: 26), pullsDown: false)
+        picker.addItems(withTitles: codes)
+        picker.selectItem(withTitle: currency)
+        picker.isEnabled = currencyPicker
+        let label = NSTextField(labelWithString: "per hour")
+        label.frame = NSRect(x: 206, y: 3, width: 80, height: 18)
+        let box = NSView(frame: NSRect(x: 0, y: 0, width: 290, height: 26))
+        [field, picker, label].forEach(box.addSubview)
+        alert.accessoryView = box
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let text = field.stringValue.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        return (Double(text).flatMap { $0 > 0 ? $0 : nil }, picker.titleOfSelectedItem)
+    }
+
+    /// "Export hours": period, rows, rounding and format, then where to save.
+    private func export(name: String, include: @escaping (Project) -> Bool) {
+        let alert = NSAlert()
+        alert.messageText = "Export hours for \(name)"
+        alert.informativeText = "One row per project for each day, week or month, with rates and amounts where set."
+        func popup(_ items: [String], selected: Int, y: CGFloat) -> NSPopUpButton {
+            let p = NSPopUpButton(frame: NSRect(x: 90, y: y, width: 190, height: 26), pullsDown: false)
+            p.addItems(withTitles: items)
+            p.selectItem(at: selected)
+            return p
+        }
+        func label(_ s: String, y: CGFloat) -> NSTextField {
+            let l = NSTextField(labelWithString: s)
+            l.frame = NSRect(x: 0, y: y + 4, width: 86, height: 18)
+            return l
+        }
+        let periods = ["This week", "Last week", "This month", "Last month"]
+        let period = popup(periods, selected: 2, y: 96)
+        let rows = popup(Timesheet.Grouping.allCases.map(\.rawValue), selected: 0, y: 64)
+        let rounding = popup(["None", "15 minutes", "30 minutes"], selected: 0, y: 32)
+        let format = popup(TimesheetFile.Format.allCases.map(\.rawValue), selected: 0, y: 0)
+        let box = NSView(frame: NSRect(x: 0, y: 0, width: 290, height: 124))
+        for (l, y) in [("Period", 96), ("One row per", 64), ("Round to", 32), ("Format", 0)] as [(String, CGFloat)] {
+            box.addSubview(label(l, y: y))
+        }
+        [period, rows, rounding, format].forEach(box.addSubview)
+        alert.accessoryView = box
+        alert.addButton(withTitle: "Export…")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let cal = Calendar.current, now = Date()
+        let unit: Calendar.Component = period.indexOfSelectedItem < 2 ? .weekOfYear : .month
+        let anchor = period.indexOfSelectedItem % 2 == 1 ? cal.date(byAdding: unit, value: -1, to: now)! : now
+        guard let range = cal.dateInterval(of: unit, for: anchor) else { return }
+        let grouping = Timesheet.Grouping.allCases[rows.indexOfSelectedItem]
+        let fileFormat = TimesheetFile.Format.allCases[format.indexOfSelectedItem]
+        let sheet = timesheet(range, grouping: grouping, round: [0, 15, 30][rounding.indexOfSelectedItem], include: include)
+        guard !sheet.rows.isEmpty else {
+            let empty = NSAlert()
+            empty.messageText = "Nothing to export"
+            empty.informativeText = "\(name) has no time in that period."
+            empty.runModal()
+            return
+        }
+        let save = NSSavePanel()
+        let when = unit == .month ? range.start.formatted(.dateTime.month(.wide).year())
+            : "week of \(range.start.formatted(.dateTime.day().month(.abbreviated).year()))"
+        save.nameFieldStringValue = "\(name) \(when).\(fileFormat.fileExtension)".replacingOccurrences(of: "/", with: "-")
+        save.allowedContentTypes = [fileFormat == .xlsx ? .init(filenameExtension: "xlsx")! : .commaSeparatedText]
+        guard save.runModal() == .OK, let url = save.url else { return }
+        do {
+            try TimesheetFile.data(sheet, grouping: grouping, format: fileFormat).write(to: url)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            Log.line("timesheet export failed: \(error)")
+            let fail = NSAlert(error: error)
+            fail.runModal()
+        }
+    }
+
+    /// The days in `range`, built as the timeline builds them, so totals match.
+    private func timesheet(_ range: DateInterval, grouping: Timesheet.Grouping, round: Int,
+                           include: @escaping (Project) -> Bool) -> Timesheet {
+        let cal = Calendar.current, now = TrackingEngine.now()
+        let categorizer = engine.categorizer, projects = engine.projects
+        var days: [(dayStart: Int64, blocks: [Block])] = []
+        var day = cal.startOfDay(for: range.start)
+        while day < range.end, Int64(day.timeIntervalSince1970) <= now {
+            let next = cal.date(byAdding: .day, value: 1, to: day)!
+            let from = Int64(day.timeIntervalSince1970)
+            let segs = (try? engine.store.segments(from: from, to: Int64(next.timeIntervalSince1970))) ?? []
+            if !segs.isEmpty {
+                let report = DayReport(segments: segs, dayStart: from, now: now, resolve: { categorizer.resolve($0) })
+                    .withProjects(projects, segments: segs)
+                days.append((from, report.blocks))
+            }
+            day = next
+        }
+        return Timesheet(days: days, include: include, grouping: grouping, round: round)
     }
 
     /// Cancel owns Return and Escape; the destructive button needs a click.

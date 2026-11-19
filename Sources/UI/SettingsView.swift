@@ -120,6 +120,18 @@ public final class SettingsViewModel: ObservableObject {
     public var onDeleteProject: ((Project) -> Void)?
     public var onDeleteClient: ((Client) -> Void)?
     public var onDeleteProjectRule: ((Int64) -> Void)?
+    /// The app asks for the rate and currency.
+    public var onEditClientRate: ((Client) -> Void)?
+    public var onEditProjectRate: ((Project) -> Void)?
+    /// Export hours for a client or one project.
+    public var onExportClient: ((Client) -> Void)?
+    public var onExportProject: ((Project) -> Void)?
+
+    /// "€1,330" for a project's time this month, nil without a rate.
+    func amount(_ p: Project) -> String? {
+        guard let rate = p.hourlyRate else { return nil }
+        return Fmt.money((Double(projectMonth[p.id] ?? 0) / 3600 * rate).rounded(), p.currency)
+    }
 
     public init() {}
 

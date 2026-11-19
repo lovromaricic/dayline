@@ -6,8 +6,8 @@ import GRDB
 extension DaylineDatabase {
     public func clients() throws -> [Client] {
         try pool.read { db in
-            try Row.fetchAll(db, sql: "SELECT id, name FROM client ORDER BY name COLLATE NOCASE, id").map {
-                Client(id: $0["id"], name: $0["name"])
+            try Row.fetchAll(db, sql: "SELECT id, name, currency, rate FROM client ORDER BY name COLLATE NOCASE, id").map {
+                Client(id: $0["id"], name: $0["name"], currency: $0["currency"], rate: $0["rate"])
             }
         }
     }
@@ -16,11 +16,13 @@ extension DaylineDatabase {
     public func projects() throws -> [Project] {
         try pool.read { db in
             try Row.fetchAll(db, sql: """
-                SELECT p.id, p.name, p.client_id, c.name AS client_name FROM project p
+                SELECT p.id, p.name, p.client_id, p.rate, c.name AS client_name, c.rate AS client_rate,
+                       c.currency AS client_currency FROM project p
                 LEFT JOIN client c ON c.id = p.client_id
                 ORDER BY c.name IS NULL, c.name COLLATE NOCASE, p.name COLLATE NOCASE, p.id
                 """).map {
-                Project(id: $0["id"], name: $0["name"], clientID: $0["client_id"], clientName: $0["client_name"])
+                Project(id: $0["id"], name: $0["name"], clientID: $0["client_id"], clientName: $0["client_name"],
+                        rate: $0["rate"], clientRate: $0["client_rate"], clientCurrency: $0["client_currency"])
             }
         }
     }
@@ -30,12 +32,22 @@ extension DaylineDatabase {
     public func addClient(name: String, at: Int64) throws -> Client {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return try pool.write { db in
-            if let row = try Row.fetchOne(db, sql: "SELECT id, name FROM client WHERE name = ? COLLATE NOCASE", arguments: [name]) {
-                return Client(id: row["id"], name: row["name"])
+            if let row = try Row.fetchOne(db, sql: "SELECT id, name, currency, rate FROM client WHERE name = ? COLLATE NOCASE", arguments: [name]) {
+                return Client(id: row["id"], name: row["name"], currency: row["currency"], rate: row["rate"])
             }
             try db.execute(sql: "INSERT INTO client (name, created_at) VALUES (?, ?)", arguments: [name, at])
             return Client(id: db.lastInsertedRowID, name: name)
         }
+    }
+
+    /// nil rate shows hours only; nil currency is your Mac's.
+    public func setClientRate(id: Int64, rate: Double?, currency: String?) throws {
+        try pool.write { try $0.execute(sql: "UPDATE client SET rate = ?, currency = ? WHERE id = ?", arguments: [rate, currency, id]) }
+    }
+
+    /// nil uses the client's rate.
+    public func setProjectRate(id: Int64, rate: Double?) throws {
+        try pool.write { try $0.execute(sql: "UPDATE project SET rate = ? WHERE id = ?", arguments: [rate, id]) }
     }
 
     public func renameClient(id: Int64, name: String) throws {

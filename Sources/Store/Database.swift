@@ -104,6 +104,14 @@ public final class DaylineDatabase {
                 ALTER TABLE segment ADD COLUMN project_id INTEGER;
                 """)
         }
+        m.registerMigration("v6-rates") { db in
+            // An hourly rate per client (in its currency), and per project to override it.
+            try db.execute(sql: """
+                ALTER TABLE client ADD COLUMN currency TEXT;
+                ALTER TABLE client ADD COLUMN rate REAL;
+                ALTER TABLE project ADD COLUMN rate REAL;
+                """)
+        }
         return m
     }
 

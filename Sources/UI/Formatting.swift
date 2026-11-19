@@ -54,6 +54,16 @@ enum Fmt {
     }
 
     /// "50 min", "1h 05m" (popover card, total subtitle).
+    /// "€1,330", "$887.50": whole amounts without cents.
+    static func money(_ amount: Double, _ currency: String) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = currency
+        f.maximumFractionDigits = amount.rounded() == amount ? 0 : 2
+        f.minimumFractionDigits = f.maximumFractionDigits
+        return f.string(from: amount as NSNumber) ?? "\(amount) \(currency)"
+    }
+
     static func minutes(_ seconds: Int64) -> String {
         seconds >= 3600 ? Durations.format(seconds) : "\(max(0, seconds) / 60) min"
     }

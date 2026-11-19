@@ -4,12 +4,21 @@ import Foundation
 public struct Client: Equatable, Hashable, Identifiable, Sendable {
     public var id: Int64
     public var name: String
+    /// ISO code ("EUR"); nil is your Mac's currency.
+    public var currency: String?
+    /// Per hour, for every project unless a project has its own.
+    public var rate: Double?
 
-    public init(id: Int64, name: String) {
+    public init(id: Int64, name: String, currency: String? = nil, rate: Double? = nil) {
         self.id = id
         self.name = name
+        self.currency = currency
+        self.rate = rate
     }
 }
+
+/// Your Mac's currency, for clients that have none set.
+public let defaultCurrency = Locale.current.currency?.identifier ?? "EUR"
 
 /// What a block belongs to (Krediti). A block has one project or none; the
 /// client follows from the project.
@@ -19,13 +28,26 @@ public struct Project: Equatable, Hashable, Identifiable, Sendable {
     public var clientID: Int64?
     /// The client's name, for "Erste · Krediti".
     public var clientName: String?
+    /// Its own rate, over the client's.
+    public var rate: Double?
+    public var clientRate: Double?
+    /// The client's currency; nil is your Mac's.
+    public var clientCurrency: String?
 
-    public init(id: Int64, name: String, clientID: Int64? = nil, clientName: String? = nil) {
+    public init(id: Int64, name: String, clientID: Int64? = nil, clientName: String? = nil,
+                rate: Double? = nil, clientRate: Double? = nil, clientCurrency: String? = nil) {
         self.id = id
         self.name = name
         self.clientID = clientID
         self.clientName = clientName
+        self.rate = rate
+        self.clientRate = clientRate
+        self.clientCurrency = clientCurrency
     }
+
+    /// What an hour costs: its own rate, else its client's; nil shows hours only.
+    public var hourlyRate: Double? { rate ?? clientRate }
+    public var currency: String { clientCurrency ?? defaultCurrency }
 
     /// "Erste · Krediti", or "Dayline" without a client.
     public var fullName: String { clientName.map { "\($0) · \(name)" } ?? name }

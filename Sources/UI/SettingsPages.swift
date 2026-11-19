@@ -452,11 +452,16 @@ struct ProjectsPage: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Text((c?.name ?? "No client").uppercased()).eyebrow()
-                Text(Durations.format(total)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.textFaint)
+                Text(clientTotal(c, projects, total)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.textFaint)
                 Spacer()
                 if let c {
+                    Button("Export…") { vm.onExportClient?(c) }
+                        .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                        .disabled(projects.isEmpty)
                     Menu {
                         Button("Rename…") { rename(c) }
+                        Button(c.rate == nil ? "Set rate…" : "Edit rate…") { vm.onEditClientRate?(c) }
+                        Divider()
                         Button("Delete client…") { vm.onDeleteClient?(c) }
                     } label: {
                         Image(systemName: "ellipsis").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
@@ -479,6 +484,10 @@ struct ProjectsPage: View {
                             Spacer()
                             Text(Durations.format(vm.projectMonth[p.id] ?? 0)).font(.system(size: 13).monospacedDigit())
                                 .foregroundStyle(Theme.textMuted)
+                            if let money = vm.amount(p) {
+                                Text(money).font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                                    .frame(minWidth: 64, alignment: .trailing)
+                            }
                             Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.textFaint)
                         }
                         .padding(.horizontal, 18).frame(height: 44)
@@ -496,6 +505,16 @@ struct ProjectsPage: View {
         }
     }
 
+    /// "34h 20m · €2,243", or "· no rate" for a client without one.
+    private func clientTotal(_ c: Client?, _ projects: [Project], _ total: Int64) -> String {
+        let time = Durations.format(total)
+        guard let c else { return time }
+        var sums: [String: Double] = [:]
+        for p in projects { if let r = p.hourlyRate { sums[p.currency, default: 0] += Double(vm.projectMonth[p.id] ?? 0) / 3600 * r } }
+        if sums.isEmpty { return c.rate == nil ? "\(time) · no rate" : time }
+        return ([time] + sums.sorted { $0.key < $1.key }.map { Fmt.money($0.value, $0.key) }).joined(separator: " · ")
+    }
+
     private func rename(_ c: Client) {
         if let n = askName("Rename client", c.name) { vm.onRenameClient?(c.id, n) }
     }
@@ -507,6 +526,12 @@ private struct ProjectPanel: View {
     let project: Project
 
     private var rules: [ProjectRule] { vm.projectRules.filter { $0.projectID == project.id } }
+
+    private var rateText: String {
+        if let r = project.rate { return "Own rate · \(Fmt.money(r, project.currency)) / h" }
+        if let r = project.clientRate { return "Client rate · \(Fmt.money(r, project.currency)) / h" }
+        return "No rate · hours only"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -523,9 +548,22 @@ private struct ProjectPanel: View {
                 .buttonStyle(.plain).accessibilityLabel("Close")
                 .keyboardShortcut(.cancelAction)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(Durations.format(vm.projectMonth[project.id] ?? 0)).font(.system(size: 22, weight: .light).monospacedDigit())
-                Text("this month").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            HStack(alignment: .top, spacing: 28) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Durations.format(vm.projectMonth[project.id] ?? 0)).font(.system(size: 22, weight: .light).monospacedDigit())
+                    Text("this month").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                }
+                if let money = vm.amount(project), let rate = project.hourlyRate {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(money).font(.system(size: 22, weight: .light).monospacedDigit())
+                        Text("at \(Fmt.money(rate, project.currency)) / h").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                    }
+                }
+            }
+            HStack(spacing: 6) {
+                Text(rateText).font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                Button("Change") { vm.onEditProjectRate?(project) }
+                    .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("AUTO-ADDS").eyebrow()
@@ -565,6 +603,8 @@ private struct ProjectPanel: View {
             }
             Spacer()
             VStack(alignment: .leading, spacing: 10) {
+                Button("Export hours…") { vm.onExportProject?(project) }
+                    .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                 Button("Rename…") {
                     if let n = askName("Rename project", project.name) { vm.onRenameProject?(project.id, n) }
                 }
