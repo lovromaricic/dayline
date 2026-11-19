@@ -289,6 +289,18 @@ public final class HomeViewModel: ObservableObject {
         onSplitCall?(block)
     }
 
+    /// "Remove from this call": counts that category's time in the call as
+    /// the call itself; returns the segments it pinned, for Undo.
+    public var onCountAsCall: ((Block, ActivityCategory) -> [Int64])?
+    public var onUnpinSegments: (([Int64]) -> Void)?
+
+    @discardableResult
+    public func countAsCall(_ block: Block, _ category: ActivityCategory) -> [Int64] {
+        onCountAsCall?(block, category) ?? []
+    }
+
+    public func unpinSegments(_ ids: [Int64]) { onUnpinSegments?(ids) }
+
     public func wholeCall(_ call: DayReport.Call) {
         pendingCorrection = nil
         onWholeCall?(call)

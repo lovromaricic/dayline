@@ -43,6 +43,8 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onAlways = { [weak self] correction in self?.always(correction) }
         viewModel.onSplitCall = { [weak self] block in self?.splitCall(block) }
         viewModel.onDeleteBlock = { [weak self] block in self?.deleteBlock(block) }
+        viewModel.onCountAsCall = { [weak self] block, category in self?.countAsCall(block, category) ?? [] }
+        viewModel.onUnpinSegments = { [weak self] ids in self?.unpin(ids) }
         viewModel.onSetNote = { [weak self] block, note in self?.setNote(block, note) }
         viewModel.onSetProject = { [weak self] block, project in self?.setProject(block, project) }
         viewModel.onProjectAlways = { [weak self] c in self?.projectAlways(c) }
@@ -158,6 +160,38 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
             try engine.store.deleteSegments(ids: block.segmentIDs)
         } catch {
             Log.line("delete block failed: \(error)")
+        }
+        reload()
+        onRulesChanged?()
+    }
+
+    /// "Not work during the call": the category's segments in the call are
+    /// pinned to Meetings, so they stay the call's time (no gap, no split).
+    private func countAsCall(_ block: Block, _ category: ActivityCategory) -> [Int64] {
+        let ids = Set(block.segmentIDs)
+        let picked = Segment.narrowingCalls(segments).filter { s in
+            guard ids.contains(s.id) else { return false }
+            var plain = s
+            plain.wholeCall = false
+            return engine.categorizer.resolve(plain).category == category
+        }.map(\.id)
+        guard !picked.isEmpty else { return [] }
+        do {
+            try engine.store.setManualCategory(segmentIDs: picked, categoryID: block.category.id)
+        } catch {
+            Log.line("count as call failed: \(error)")
+            return []
+        }
+        reload()
+        onRulesChanged?()
+        return picked
+    }
+
+    private func unpin(_ ids: [Int64]) {
+        do {
+            try engine.store.setManualCategory(segmentIDs: ids, categoryID: nil)
+        } catch {
+            Log.line("unpin failed: \(error)")
         }
         reload()
         onRulesChanged?()

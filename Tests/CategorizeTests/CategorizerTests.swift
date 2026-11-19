@@ -122,6 +122,8 @@ extension CategorizerTests {
         #expect(c.resolve(figma).category == .meetings && c.resolve(figma).wholeCall)   // beats your rules
         figma.manualCategoryID = ActivityCategory.design.id
         #expect(c.resolve(figma).category == .design && !c.resolve(figma).wholeCall)   // your correction beats the call
+        figma.manualCategoryID = ActivityCategory.meetings.id                       // "not work": still the call
+        #expect(c.resolve(figma).category == .meetings && c.resolve(figma).wholeCall)
         figma.manualCategoryID = nil
         c.wholeCallsSince = 1                                  // recorded before whole calls
         #expect(c.resolve(figma).category == .writing)

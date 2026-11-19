@@ -52,10 +52,15 @@ public struct Categorizer: Sendable {
 
     public func resolve(_ s: Segment, ignoringManual: Bool = false) -> CategoryResolution {
         let guess = self.guess(s)
+        let inCall = callsAreMeetings && s.wholeCall && s.start >= wholeCallsSince
         if !ignoringManual, let id = s.manualCategoryID, let c = categories[id] {
+            // Pinned to Meetings inside a call ("not work during the call"): still the call.
+            if inCall && c == current(.meetings) {
+                return CategoryResolution(category: c, guess: c, edited: false, wholeCall: true)
+            }
             return CategoryResolution(category: c, guess: guess, edited: c != guess)
         }
-        if callsAreMeetings && s.wholeCall && s.start >= wholeCallsSince {
+        if inCall {
             let m = current(.meetings)
             return CategoryResolution(category: m, guess: m, edited: false, wholeCall: true)
         }

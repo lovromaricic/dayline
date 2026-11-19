@@ -213,7 +213,8 @@ public struct DayReport: Equatable, Sendable {
         }
         var cache: [Int64: CategoryResolution] = [:]
         for s in clipped where s.kind == .active { cache[s.id] = resolve(s) }
-        let pinned = Set(clipped.filter { $0.wholeCall && $0.manualCategoryID != nil }.map(\.id))
+        // A pin that keeps the segment in its call (Meetings) does not split it.
+        let pinned = Set(clipped.filter { $0.wholeCall && $0.manualCategoryID != nil && cache[$0.id]?.wholeCall != true }.map(\.id))
         for i in calls.indices { calls[i].split = calls[i].segmentIDs.contains(where: pinned.contains) }
         let category: (Segment) -> ActivityCategory = { cache[$0.id]?.category ?? .uncategorized }
         away = DayReport.visibleBreaks(away)

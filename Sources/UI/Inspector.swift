@@ -7,6 +7,7 @@ struct Inspector: View {
     /// The block whose "Delete" is waiting for a yes; another selection drops it.
     @State private var confirmingDelete: Int64?
     @State private var deleteHover = false
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         Group {
@@ -281,10 +282,23 @@ struct Inspector: View {
                             .padding(.leading, 16)
                         }
                     }
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        Button("Remove from this call", role: .destructive) { removeFromCall(b, c) }
+                    }
                     .accessibilityElement(children: .combine)
+                    .accessibilityAction(named: "Remove from this call") { removeFromCall(b, c) }
                 }
             }
         }
+    }
+
+    /// The row goes; its time stays the call's. ⌘Z brings it back.
+    private func removeFromCall(_ b: Block, _ c: ActivityCategory) {
+        let ids = vm.countAsCall(b, c)
+        guard !ids.isEmpty else { return }
+        undoManager?.registerUndo(withTarget: vm) { $0.unpinSegments(ids) }
+        undoManager?.setActionName("Remove from Call")
     }
 
     private func minutes(_ parts: [CallDetail.Part], _ c: ActivityCategory) -> Int64 {
