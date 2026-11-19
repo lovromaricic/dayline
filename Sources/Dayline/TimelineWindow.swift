@@ -46,6 +46,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         viewModel.onSetNote = { [weak self] block, note in self?.setNote(block, note) }
         viewModel.onSetProject = { [weak self] block, project in self?.setProject(block, project) }
         viewModel.onProjectAlways = { [weak self] c in self?.projectAlways(c) }
+        viewModel.onSetScope = { [weak self] _ in self?.reload(); self?.viewModel.replay += 1 }
         viewModel.onSearchAllDays = { [weak self] query in self?.searchAllDays(query) }
         viewModel.onShowOlderMonth = { [weak self] in self?.showOlderMonth() }
         viewModel.onWholeCall = { [weak self] call in self?.wholeCall(call) }
@@ -305,8 +306,17 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         let categorizer = engine.categorizer
         if viewModel.categories != categorizer.categoryList { viewModel.categories = categorizer.categoryList }
         if viewModel.projects != engine.projects.list { viewModel.projects = engine.projects.list }
-        let report = DayReport(segments: segments, dayStart: dayStart, now: TrackingEngine.now(),
-                               resolve: { categorizer.resolve($0) }).withProjects(engine.projects, segments: segments)
+        if viewModel.projects.isEmpty {
+            if viewModel.scope != nil { viewModel.setScope(nil); return }
+            if viewModel.mode == .byProject { viewModel.mode = .byCategory }
+        }
+        let shown = scoped(segments)
+        let report = DayReport(segments: shown, dayStart: dayStart, now: TrackingEngine.now(),
+                               resolve: { categorizer.resolve($0) }).withProjects(engine.projects, segments: shown)
+        // Filtered: the whole day's time too, for "79% of 6h 25m".
+        let unscoped = viewModel.scope == nil ? 0
+            : DayReport(segments: segments, dayStart: dayStart, now: TrackingEngine.now(), resolve: { categorizer.resolve($0) }).tracked
+        if viewModel.unscopedTracked != unscoped { viewModel.unscopedTracked = unscoped }
         viewModel.update(engine.hidesTitlesNow ? report.hidingTitles() : report)
         let week = viewModel.period == .day ? nil : loadSpan()
         if viewModel.week != week { viewModel.week = week }
@@ -416,8 +426,9 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         let reports = starts.filter { $0 <= today }.map { day in
             if day < today, let kept = pastDays[day] { return kept }
             let next = Self.startOfDay(cal.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: TimeInterval(day)))!)
-            let segs = (try? engine.store.segments(from: day, to: next)) ?? []
+            let segs = scoped((try? engine.store.segments(from: day, to: next)) ?? [])
             let report = DayReport(segments: segs, dayStart: day, now: now, resolve: { categorizer.resolve($0) })
+                .withProjects(engine.projects, segments: segs)
             let shown = engine.hidesTitlesNow ? report.hidingTitles() : report
             if day < today { pastDays[day] = shown }
             return shown
@@ -495,6 +506,16 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     func windowWillClose(_ notification: Notification) {
         timer?.invalidate()
         timer = nil
+        // Tomorrow it opens on all work, not on a filter you forgot about.
+        viewModel.setScope(nil)
+    }
+
+    /// With the header filter on, only that client's or project's active time
+    /// is kept; away and untracked stretches stay, so the day's shape does too.
+    private func scoped(_ segs: [Segment]) -> [Segment] {
+        guard let scope = viewModel.scope else { return segs }
+        let resolver = engine.projects
+        return segs.filter { $0.kind != .active || scope.contains(resolver.resolve($0)?.project) }
     }
 
     static func startOfDay(_ d: Date) -> Int64 { Int64(Calendar.current.startOfDay(for: d).timeIntervalSince1970) }

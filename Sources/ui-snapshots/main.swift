@@ -160,6 +160,18 @@ projectVM.pendingProjectRule = ProjectCorrection(blockID: pickedBlock.id, kind: 
 let ruleVM = HomeViewModel(report: projectReport)
 ruleVM.projects = [krediti, georgeApp]
 ruleVM.selection = projectReport.blocks.first { $0.title == "Onboarding – Figma" }!.id
+// By project lanes, then the same day narrowed to Erste.
+let byProjectVM = HomeViewModel(report: projectReport)
+byProjectVM.projects = [krediti, georgeApp]
+byProjectVM.mode = .byProject
+let ersteResolver = ProjectResolver(projects: [krediti, georgeApp], rules: [projectRule])
+let ersteDay = homeDay.filter { $0.kind != .active || ersteResolver.resolve($0)?.project.clientID == 1 }
+let scopedVM = HomeViewModel(report: DayReport(segments: ersteDay, dayStart: dayStart, now: now, category: homeCategory)
+    .withProjects(ersteResolver, segments: ersteDay))
+scopedVM.projects = [krediti, georgeApp]
+scopedVM.mode = .byProject
+scopedVM.setScope(.client(Client(id: 1, name: "Erste")))
+scopedVM.unscopedTracked = homeReport.tracked
 func vm(_ report: DayReport, _ phase: TrackingPhase, granted: Bool = false) -> HomeViewModel {
     let v = HomeViewModel(report: report)
     v.phase = phase
@@ -271,6 +283,8 @@ let homes: [(String, HomeViewModel)] = [
     ("home-01-selected", selectedVM),
     ("home-14-project-prompt", projectVM),
     ("home-15-project-rule", ruleVM),
+    ("home-16-by-project", byProjectVM),
+    ("home-17-scoped-erste", scopedVM),
     ("home-02-nothing-selected", HomeViewModel(report: homeReport)),
     ("home-03-first-launch", vm(empty, .needsPermission)),
     ("home-04-waiting", vm(empty, .waitingForPermission)),

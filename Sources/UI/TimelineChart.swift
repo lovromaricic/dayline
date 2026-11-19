@@ -30,6 +30,9 @@ struct TimelineChart: View {
         var color: Color?
         var total: Int64
         var blocks: [Block]
+        /// A By project lane: clicking its name shows only that project.
+        var project: Project?
+        var faint = false
     }
 
     private var rows: [Row] {
@@ -40,7 +43,28 @@ struct TimelineChart: View {
             let lanes = vm.showAllLanes ? r.lanes : Array(r.lanes.prefix(HomeViewModel.laneCap))
             return lanes.map { Row(id: $0.category.name, label: $0.category.name, category: $0.category,
                                    color: Color(hexString: $0.category.color), total: $0.total, blocks: $0.blocks) }
+        case .byProject:
+            return projectRows
         }
+    }
+
+    /// One lane per project, largest first, No project last. The lane names
+    /// the project, so bars keep their category colours.
+    private var projectRows: [Row] {
+        var byID: [Int64: (Project, [Block])] = [:]
+        var none: [Block] = []
+        for b in r.blocks {
+            if let p = b.project { byID[p.id, default: (p, [])].1.append(b) } else { none.append(b) }
+        }
+        let total = { (bs: [Block]) in bs.reduce(Int64(0)) { $0 + $1.duration } }
+        var rows = byID.values.sorted { total($0.1) > total($1.1) }.map { p, bs in
+            Row(id: "p\(p.id)", label: vm.scope == nil ? p.fullName : p.name, category: nil, color: nil,
+                total: total(bs), blocks: bs, project: p)
+        }
+        if !none.isEmpty {
+            rows.append(Row(id: "none", label: "No project", category: nil, color: nil, total: total(none), blocks: none, faint: true))
+        }
+        return rows
     }
 
     var body: some View {
@@ -58,8 +82,12 @@ struct TimelineChart: View {
                     HStack(spacing: 8) {
                         if let c = row.color { Circle().fill(c).frame(width: 8, height: 8) }
                         Text(row.label).font(.system(size: 13)).lineLimit(1)
+                            .foregroundStyle(row.faint ? Theme.textMuted : Theme.text)
                     }
                     .frame(width: labelWidth, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { if let p = row.project, vm.scope == nil { vm.setScope(.project(p)) } }
+                    .help(row.project != nil && vm.scope == nil ? "Show only \(row.label)" : "")
                     GeometryReader { geo in lane(row, index: index, width: geo.size.width) }.frame(height: laneHeight)
                     Text(Durations.format(row.total))
                         .font(.system(size: 13).monospacedDigit()).foregroundStyle(Theme.textMuted)

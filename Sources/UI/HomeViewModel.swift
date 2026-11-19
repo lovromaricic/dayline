@@ -10,7 +10,37 @@ public enum Period: String, CaseIterable, Sendable {
 
 public enum TimelineMode: String, CaseIterable, Sendable {
     case byCategory = "By category"
+    case byProject = "By project"
     case timeline = "Timeline"
+}
+
+/// The header filter: everything on screen counts only this client or project.
+public enum ProjectScope: Equatable, Sendable {
+    case client(Client)
+    case project(Project)
+
+    public var name: String {
+        switch self {
+        case .client(let c): c.name
+        case .project(let p): p.name
+        }
+    }
+
+    /// "Erste · Krediti" for a project with a client.
+    public var label: String {
+        switch self {
+        case .client(let c): c.name
+        case .project(let p): p.fullName
+        }
+    }
+
+    public func contains(_ p: Project?) -> Bool {
+        guard let p else { return false }
+        switch self {
+        case .client(let c): return p.clientID == c.id
+        case .project(let q): return p.id == q.id
+        }
+    }
 }
 
 /// "Always categorize developer.apple.com as Development?" (spec 4, screen 01).
@@ -120,6 +150,21 @@ public final class HomeViewModel: ObservableObject {
     @Published public var projects: [Project] = []
     /// "Always put … in …?" after picking a project, until answered or deselected.
     @Published public var pendingProjectRule: ProjectCorrection?
+    /// The header filter; nil is all work. Resets when the window closes.
+    @Published public private(set) var scope: ProjectScope?
+    /// While filtered: the day's time across all work, for "79% of 6h 25m".
+    @Published public var unscopedTracked: Int64 = 0
+    /// The app reloads the day, week or month with only that client or project.
+    public var onSetScope: ((ProjectScope?) -> Void)?
+
+    public func setScope(_ s: ProjectScope?) {
+        guard s != scope else { return }
+        scope = s
+        selection = nil
+        pendingCorrection = nil
+        pendingProjectRule = nil
+        onSetScope?(s)
+    }
 
     // Tracking state (spec 2.2) and onboarding settings (screens 03–07).
     @Published public var phase: TrackingPhase = .tracking

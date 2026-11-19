@@ -179,6 +179,11 @@ public struct HomeView: View {
     /// One header for day, week and month: the same views with new values, so
     /// the big total rolls from the day's to the week's instead of swapping.
     private var summaryHeader: some View {
+        if let scope = vm.scope {
+            let total = vm.period == .day ? r.tracked : vm.week?.tracked ?? 0
+            let (first, second) = scopedHeadline(scope, total: total)
+            return summary(first, second, total: total, subtitle: scopedSubtitle(total))
+        }
         if vm.period != .day, let w = vm.week {
             let (first, second) = w.headline()
             let days = "\(w.trackedDays) day\(w.trackedDays == 1 ? "" : "s")"
@@ -224,6 +229,91 @@ public struct HomeView: View {
         return tracked
     }
 
+    /// "Erste took 5h 05m today," / "mostly Krediti." Plain facts, for invoicing.
+    private func scopedHeadline(_ scope: ProjectScope, total: Int64) -> (String, String) {
+        let when: String
+        switch vm.period {
+        case .day: when = r.isToday ? "today" : "on \(Fmt.date(r.dayStart).formatted(.dateTime.weekday(.wide)))"
+        case .week: when = vm.week?.containsToday == true ? "this week" : "that week"
+        case .month: when = "in \(Fmt.date(vm.week?.weekStart ?? r.dayStart).formatted(.dateTime.month(.wide)))"
+        }
+        guard total > 0 else { return ("Nothing for \(scope.name) \(when).", "Its time shows here once you work on it.") }
+        let first = "\(scope.name) took \(Durations.format(total)) \(when),"
+        // A client: its biggest project (day only, from the blocks); a project: its biggest category.
+        if case .client = scope, vm.period == .day {
+            var byProject: [String: Int64] = [:]
+            for b in r.blocks { if let p = b.project { byProject[p.name, default: 0] += b.duration } }
+            if byProject.count > 1, let top = byProject.max(by: { $0.value < $1.value }) { return (first, "mostly \(top.key).") }
+        }
+        let lanes = vm.period == .day ? r.lanes.map { ($0.category, $0.total) } : (vm.week?.categories ?? []).map { ($0.category, $0.total) }
+        if let top = lanes.first, lanes.count > 1 { return (first, "mostly \(top.0.shortName).") }
+        if let top = lanes.first { return (first, "all of it \(top.0.shortName).") }
+        return (first, "")
+    }
+
+    private func scopedSubtitle(_ total: Int64) -> String {
+        if vm.period == .day, vm.unscopedTracked > 0 {
+            let pct = Int((Double(total) / Double(vm.unscopedTracked) * 100).rounded())
+            return "\(pct)% of \(Durations.format(vm.unscopedTracked)) tracked\(r.isToday ? " today" : "")"
+        }
+        guard let w = vm.week, w.trackedDays > 0 else { return "Nothing yet" }
+        return w.trackedDays > 1 ? "on \(w.trackedDays) days · avg \(Durations.format(w.average))" : "on 1 day"
+    }
+
+    /// All work ▾, or the active filter as a lime chip with ×.
+    @ViewBuilder
+    private var scopeControl: some View {
+        if let scope = vm.scope {
+            HStack(spacing: 6) {
+                Text(scope.label).font(.system(size: 12, weight: .medium))
+                Button { vm.setScope(nil) } label: {
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).frame(width: 16, height: 16).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Show all work")
+                .accessibilityLabel("Show all work")
+            }
+            .foregroundStyle(Theme.onAccent)
+            .padding(.leading, 10).padding(.trailing, 4).frame(height: 24)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Theme.accent))
+        } else {
+            Menu {
+                Button("All work") { vm.setScope(nil) }
+                ForEach(scopeGroups, id: \.0.id) { client, projects in
+                    Divider()
+                    Button("\(client.name) · all projects") { vm.setScope(.client(client)) }
+                    ForEach(projects) { p in Button("    \(p.name)") { vm.setScope(.project(p)) } }
+                }
+                let loose = vm.projects.filter { $0.clientID == nil }
+                if !loose.isEmpty {
+                    Divider()
+                    ForEach(loose) { p in Button(p.name) { vm.setScope(.project(p)) } }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("All work").font(.system(size: 12))
+                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+                }
+                .foregroundStyle(Theme.textMuted)
+                .padding(.horizontal, 10).frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Theme.railFill))
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+            .help("Show only one client or project")
+        }
+    }
+
+    /// Clients with their projects, in the store's order.
+    private var scopeGroups: [(Client, [Project])] {
+        var out: [(Client, [Project])] = []
+        for p in vm.projects {
+            guard let id = p.clientID, let name = p.clientName else { continue }
+            if let i = out.firstIndex(where: { $0.0.id == id }) { out[i].1.append(p) } else { out.append((Client(id: id, name: name), [p])) }
+        }
+        return out
+    }
+
     /// Today, or the week or month that holds today: nothing later to move to.
     private var atLatest: Bool { vm.period == .day ? r.isToday : vm.week?.containsToday ?? true }
 
@@ -252,6 +342,7 @@ public struct HomeView: View {
             }
             chevron("chevron.left", label: "Previous \(unit)", enabled: true) { vm.onMoveDay?(-1) }
             chevron("chevron.right", label: "Next \(unit)", enabled: !atLatest) { vm.onMoveDay?(1) }
+            if !vm.projects.isEmpty { scopeControl.padding(.leading, 8) }
         }
     }
 
@@ -292,7 +383,8 @@ public struct HomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             // The view switch is the section heading: eyebrow-style tabs.
             HStack(spacing: 20) {
-                ForEach(TimelineMode.allCases, id: \.self) { mode in
+                // By project only once a project exists.
+                ForEach(TimelineMode.allCases.filter { $0 != .byProject || !vm.projects.isEmpty }, id: \.self) { mode in
                     let on = vm.mode == mode
                     // Bars glide between their lanes and the single strip.
                     Button(mode.rawValue.uppercased()) {
