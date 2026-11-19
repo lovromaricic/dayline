@@ -192,7 +192,7 @@ struct Inspector: View {
                 .lineLimit(1)
                 Button("See \(p.name)’s auto-adds") { vm.onShowProject?(p) }
                     .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
-                    .padding(.top, -6)
+                    .padding(.top, -4)
             }
         }
     }
