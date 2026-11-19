@@ -647,8 +647,8 @@ private struct ProjectPanel: View {
                 .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
                 Button(project.isArchived ? "Unarchive" : "Archive") { vm.onArchiveProject?(project, !project.isArchived) }
                     .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
-                    .help(project.isArchived ? "Back in the pickers; its rules add new work again"
-                          : "Hides it from pickers and stops its rules; its past time stays")
+                    .help(project.isArchived ? "Back in the pickers; its auto-adds add new work again"
+                          : "Hides it from pickers and stops its auto-adds; its past time stays")
                 Button("Rename…") {
                     if let n = askName("Rename project", project.name) { vm.onRenameProject?(project.id, n) }
                 }

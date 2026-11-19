@@ -24,7 +24,7 @@ final class TimelineWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
     var onOpenSettings: (() -> Void)?
     /// The Sort note: Settings → Categories & rules.
     var onSortUnsorted: (() -> Void)?
-    /// "See Krediti's rules": Settings → Projects with that project open.
+    /// "See Krediti's auto-adds": Settings → Projects with that project open.
     var onShowProject: ((Project) -> Void)?
     private static let settingsItem = NSToolbarItem.Identifier("settings")
 

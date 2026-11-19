@@ -252,7 +252,7 @@ public final class HomeViewModel: ObservableObject {
     public var onSetProject: ((Block, Project?) -> Void)?
     /// "Always": the project learns the block's title or site.
     public var onProjectAlways: ((ProjectCorrection) -> Void)?
-    /// "See Krediti's rules": Settings → Projects with that project open.
+    /// "See Krediti's auto-adds": Settings → Projects with that project open.
     public var onShowProject: ((Project) -> Void)?
     /// "Stop": the rule that put a block in its project is removed.
     public var onStopProjectRule: ((ProjectRule) -> Void)?

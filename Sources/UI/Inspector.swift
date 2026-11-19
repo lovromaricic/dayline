@@ -183,14 +183,14 @@ struct Inspector: View {
             if let rule = b.projectRule, let p = b.project, vm.pendingProjectRule?.blockID != b.id {
                 HStack(spacing: 4) {
                     Text("Always goes to \(p.name) ·").foregroundStyle(Theme.textMuted)
-                        .help("Your rule: “\(rule.pattern)” goes to \(p.name)")
+                        .help("Auto-add: “\(rule.pattern)” goes to \(p.name)")
                     Button("Remove") { vm.stopProjectRule(rule) }
                         .buttonStyle(.plain).foregroundStyle(Theme.textSecondary)
-                        .help("Remove this rule. What it added goes back to no project.")
+                        .help("Remove this auto-add. What it added goes back to no project.")
                 }
                 .font(.system(size: 12))
                 .lineLimit(1)
-                Button("See \(p.name)’s rules") { vm.onShowProject?(p) }
+                Button("See \(p.name)’s auto-adds") { vm.onShowProject?(p) }
                     .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
                     .padding(.top, -6)
             }
